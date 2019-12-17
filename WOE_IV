@@ -1,0 +1,1181 @@
+library(data.table)
+library(caret)
+library(smbinning)
+library(woe)
+library(ggpubr)
+library(ggplot2)
+library(gridExtra)
+# loading the multiplot function
+source("http://peterhaschke.com/Code/multiplot.R")
+library(dplyr)
+library(car)
+library("ROCR")
+
+#Load Data(201801)--------------------
+library(data.table)
+NROBOT_BASE <- read.csv("NROBOT_BASE.csv",header = T)
+NROBOT_BASE_01<-subset(NROBOT_BASE, CUST_TYPE !="STAFF", ) #排除員工
+#Validation--------------------
+NROBOT_BASE_VALIDATE <- read.csv("NROBOT_BASE_VALIDATE2.csv",header = T)
+NROBOT_BASE_VALIDATE_01<-subset(NROBOT_BASE_VALIDATE, CUST_TYPE !="STAFF", ) #排除員工
+table(NROBOT_BASE_VALIDATE$TARGET)
+#非信託戶--------------------
+NROBOT_BASE_NTRUST <- read.csv("NROBOT_NTRUST_BASE.csv",header = T)
+NROBOT_BASE_NTRUST_01<-subset(NROBOT_BASE_NTRUST, CUST_TYPE !="STAFF", ) #排除員工
+table(NROBOT_BASE_NTRUST_01$TARGET)
+
+#刪除變數
+NROBOT_BASE_01$X <- NULL 
+NROBOT_BASE_01$Y <- NULL
+#--------------------
+NROBOT_BASE_VALIDATE_01$X <- NULL 
+NROBOT_BASE_VALIDATE_01$Y <- NULL
+#--------------------
+NROBOT_BASE_NTRUST_01$X <- NULL 
+NROBOT_BASE_NTRUST_01$Y <- NULL
+
+
+#指定FACTOR變數  #smbinning 函數的TARGET必須為INT
+head(NROBOT_BASE_01)
+NROBOT_BASE_01$ZIP <- as.factor(NROBOT_BASE_01$ZIP)
+NROBOT_BASE_01$RISK_LEVEL <- as.factor(NROBOT_BASE_01$RISK_LEVEL)
+NROBOT_BASE_01$FLG_KYC <- as.factor(NROBOT_BASE_01$FLG_KYC)
+NROBOT_BASE_01$SAV <- as.factor(NROBOT_BASE_01$SAV)
+NROBOT_BASE_01$FUND_EVEN <- as.factor(NROBOT_BASE_01$FUND_EVEN)
+NROBOT_BASE_01$FUND_NOW <- as.factor(NROBOT_BASE_01$FUND_NOW)
+NROBOT_BASE_01$FUND_ROBOT_EVEN <- as.factor(NROBOT_BASE_01$FUND_ROBOT_EVEN)
+NROBOT_BASE_01$FUND_ROBOT_NOW <- as.factor(NROBOT_BASE_01$FUND_ROBOT_NOW)
+NROBOT_BASE_01$FUND_ONCE_EVEN <- as.factor(NROBOT_BASE_01$FUND_ONCE_EVEN)
+NROBOT_BASE_01$FUND_RSP_EVEN <- as.factor(NROBOT_BASE_01$FUND_RSP_EVEN)
+NROBOT_BASE_01$LOAN_PERSON_EVEN <- as.factor(NROBOT_BASE_01$LOAN_PERSON_EVEN)
+NROBOT_BASE_01$LOAN_HOUSE_EVEN <- as.factor(NROBOT_BASE_01$LOAN_HOUSE_EVEN)
+NROBOT_BASE_01$LOAN_PERSON_NOW <- as.factor(NROBOT_BASE_01$LOAN_PERSON_NOW)
+NROBOT_BASE_01$LOAN_HOUSE_NOW <- as.factor(NROBOT_BASE_01$LOAN_HOUSE_NOW)
+NROBOT_BASE_01$SPD <- as.factor(NROBOT_BASE_01$SPD)
+NROBOT_BASE_01$FLG_VISIT <- as.factor(NROBOT_BASE_01$FLG_VISIT)
+#--------------------
+head(NROBOT_BASE_VALIDATE_01)
+NROBOT_BASE_VALIDATE_01$ZIP <- as.factor(NROBOT_BASE_VALIDATE_01$ZIP)
+NROBOT_BASE_VALIDATE_01$RISK_LEVEL <- as.factor(NROBOT_BASE_VALIDATE_01$RISK_LEVEL)
+NROBOT_BASE_VALIDATE_01$FLG_KYC <- as.factor(NROBOT_BASE_VALIDATE_01$FLG_KYC)
+NROBOT_BASE_VALIDATE_01$SAV <- as.factor(NROBOT_BASE_VALIDATE_01$SAV)
+NROBOT_BASE_VALIDATE_01$FUND_EVEN <- as.factor(NROBOT_BASE_VALIDATE_01$FUND_EVEN)
+NROBOT_BASE_VALIDATE_01$FUND_NOW <- as.factor(NROBOT_BASE_VALIDATE_01$FUND_NOW)
+NROBOT_BASE_VALIDATE_01$FUND_ROBOT_EVEN <- as.factor(NROBOT_BASE_VALIDATE_01$FUND_ROBOT_EVEN)
+NROBOT_BASE_VALIDATE_01$FUND_ROBOT_NOW <- as.factor(NROBOT_BASE_VALIDATE_01$FUND_ROBOT_NOW)
+NROBOT_BASE_VALIDATE_01$FUND_ONCE_EVEN <- as.factor(NROBOT_BASE_VALIDATE_01$FUND_ONCE_EVEN)
+NROBOT_BASE_VALIDATE_01$FUND_RSP_EVEN <- as.factor(NROBOT_BASE_VALIDATE_01$FUND_RSP_EVEN)
+NROBOT_BASE_VALIDATE_01$LOAN_PERSON_EVEN <- as.factor(NROBOT_BASE_VALIDATE_01$LOAN_PERSON_EVEN)
+NROBOT_BASE_VALIDATE_01$LOAN_HOUSE_EVEN <- as.factor(NROBOT_BASE_VALIDATE_01$LOAN_HOUSE_EVEN)
+NROBOT_BASE_VALIDATE_01$LOAN_PERSON_NOW <- as.factor(NROBOT_BASE_VALIDATE_01$LOAN_PERSON_NOW)
+NROBOT_BASE_VALIDATE_01$LOAN_HOUSE_NOW <- as.factor(NROBOT_BASE_VALIDATE_01$LOAN_HOUSE_NOW)
+NROBOT_BASE_VALIDATE_01$SPD <- as.factor(NROBOT_BASE_VALIDATE_01$SPD)
+NROBOT_BASE_VALIDATE_01$FLG_VISIT <- as.factor(NROBOT_BASE_VALIDATE_01$FLG_VISIT)
+#--------------------
+head(NROBOT_BASE_NTRUST_01)
+NROBOT_BASE_NTRUST_01$ZIP <- as.factor(NROBOT_BASE_NTRUST_01$ZIP)
+NROBOT_BASE_NTRUST_01$RISK_LEVEL <- as.factor(NROBOT_BASE_NTRUST_01$RISK_LEVEL)
+NROBOT_BASE_NTRUST_01$FLG_KYC <- as.factor(NROBOT_BASE_NTRUST_01$FLG_KYC)
+NROBOT_BASE_NTRUST_01$SAV <- as.factor(NROBOT_BASE_NTRUST_01$SAV)
+NROBOT_BASE_NTRUST_01$FUND_EVEN <- as.factor(NROBOT_BASE_NTRUST_01$FUND_EVEN)
+NROBOT_BASE_NTRUST_01$FUND_NOW <- as.factor(NROBOT_BASE_NTRUST_01$FUND_NOW)
+NROBOT_BASE_NTRUST_01$FUND_ROBOT_EVEN <- as.factor(NROBOT_BASE_NTRUST_01$FUND_ROBOT_EVEN)
+NROBOT_BASE_NTRUST_01$FUND_ROBOT_NOW <- as.factor(NROBOT_BASE_NTRUST_01$FUND_ROBOT_NOW)
+NROBOT_BASE_NTRUST_01$FUND_ONCE_EVEN <- as.factor(NROBOT_BASE_NTRUST_01$FUND_ONCE_EVEN)
+NROBOT_BASE_NTRUST_01$FUND_RSP_EVEN <- as.factor(NROBOT_BASE_NTRUST_01$FUND_RSP_EVEN)
+NROBOT_BASE_NTRUST_01$LOAN_PERSON_EVEN <- as.factor(NROBOT_BASE_NTRUST_01$LOAN_PERSON_EVEN)
+NROBOT_BASE_NTRUST_01$LOAN_HOUSE_EVEN <- as.factor(NROBOT_BASE_NTRUST_01$LOAN_HOUSE_EVEN)
+NROBOT_BASE_NTRUST_01$LOAN_PERSON_NOW <- as.factor(NROBOT_BASE_NTRUST_01$LOAN_PERSON_NOW)
+NROBOT_BASE_NTRUST_01$LOAN_HOUSE_NOW <- as.factor(NROBOT_BASE_NTRUST_01$LOAN_HOUSE_NOW)
+NROBOT_BASE_NTRUST_01$SPD <- as.factor(NROBOT_BASE_NTRUST_01$SPD)
+NROBOT_BASE_NTRUST_01$FLG_VISIT <- as.factor(NROBOT_BASE_NTRUST_01$FLG_VISIT)
+
+
+#確認是否有遺漏值
+sum(is.na(NROBOT_BASE_01$TD_AMT_01))
+sum(is.na(NROBOT_BASE_01$TD_AMT_12))
+sum(is.na(NROBOT_BASE_01$TD_AMT_11))
+sum(is.na(NROBOT_BASE_01$FUND_AUM))
+sum(is.na(NROBOT_BASE_01$OPN_SAV_DAYS))
+sum(is.na(NROBOT_BASE_01$TEST_KYC_DAYS))
+sum(is.na(NROBOT_BASE_01$OPN_FUND_DAYS))
+sum(is.na(NROBOT_BASE_01$SPD_MIN_DAYS))
+sum(is.na(NROBOT_BASE_01$APPROP_PERSON_DAYS))
+sum(is.na(NROBOT_BASE_01$APPROP_HOUSE_DAYS))
+sum(is.na(NROBOT_BASE_01$SPD_REC_MONTH))
+sum(is.na(NROBOT_BASE_01$SPD_MIN_MONTH))
+#--------------------
+sum(is.na(NROBOT_BASE_VALIDATE_01$TD_AMT_04))
+sum(is.na(NROBOT_BASE_VALIDATE_01$TD_AMT_03))
+sum(is.na(NROBOT_BASE_VALIDATE_01$TD_AMT_02))
+sum(is.na(NROBOT_BASE_VALIDATE_01$FUND_AUM))
+sum(is.na(NROBOT_BASE_VALIDATE_01$OPN_SAV_DAYS))
+sum(is.na(NROBOT_BASE_VALIDATE_01$TEST_KYC_DAYS))
+sum(is.na(NROBOT_BASE_VALIDATE_01$OPN_FUND_DAYS))
+sum(is.na(NROBOT_BASE_VALIDATE_01$SPD_MIN_DAYS))
+sum(is.na(NROBOT_BASE_VALIDATE_01$APPROP_PERSON_DAYS))
+sum(is.na(NROBOT_BASE_VALIDATE_01$APPROP_HOUSE_DAYS))
+sum(is.na(NROBOT_BASE_VALIDATE_01$SPD_REC_MONTH))
+sum(is.na(NROBOT_BASE_VALIDATE_01$SPD_MIN_MONTH))
+sum(is.na(NROBOT_BASE_VALIDATE_01$PB_AMT_04))
+sum(is.na(NROBOT_BASE_VALIDATE_01$NTD_AMT_03))
+sum(is.na(NROBOT_BASE_VALIDATE_01$NTD_AMT_02))
+sum(is.na(NROBOT_BASE_VALIDATE_01$PB_AMT_1M_DIF))
+sum(is.na(NROBOT_BASE_VALIDATE_01$PB_AMT_L1M_DIF))
+sum(is.na(NROBOT_BASE_VALIDATE_01$PB_AMT_2M_DIF_AVG))
+#--------------------
+sum(is.na(NROBOT_BASE_NTRUST_01$TD_AMT_01))
+sum(is.na(NROBOT_BASE_NTRUST_01$TD_AMT_12))
+sum(is.na(NROBOT_BASE_NTRUST_01$TD_AMT_11))
+sum(is.na(NROBOT_BASE_NTRUST_01$FUND_AUM))
+sum(is.na(NROBOT_BASE_NTRUST_01$OPN_SAV_DAYS))
+sum(is.na(NROBOT_BASE_NTRUST_01$TEST_KYC_DAYS))
+sum(is.na(NROBOT_BASE_NTRUST_01$OPN_FUND_DAYS))
+sum(is.na(NROBOT_BASE_NTRUST_01$SPD_MIN_DAYS))
+sum(is.na(NROBOT_BASE_NTRUST_01$APPROP_PERSON_DAYS))
+sum(is.na(NROBOT_BASE_NTRUST_01$APPROP_HOUSE_DAYS))
+sum(is.na(NROBOT_BASE_NTRUST_01$SPD_REC_MONTH))
+sum(is.na(NROBOT_BASE_NTRUST_01$SPD_MIN_MONTH))
+sum(is.na(NROBOT_BASE_NTRUST_01$OPN_TRUST_DAYS))
+
+
+#遺漏值補零
+NROBOT_BASE_01$TD_AMT_01[is.na(NROBOT_BASE_01$TD_AMT_01)]<-0
+NROBOT_BASE_01$TD_AMT_12[is.na(NROBOT_BASE_01$TD_AMT_12)]<-0
+NROBOT_BASE_01$TD_AMT_11[is.na(NROBOT_BASE_01$TD_AMT_11)]<-0
+NROBOT_BASE_01$OPN_SAV_DAYS[is.na(NROBOT_BASE_01$OPN_SAV_DAYS)]<-0
+NROBOT_BASE_01$TEST_KYC_DAYS[is.na(NROBOT_BASE_01$TEST_KYC_DAYS)]<-0
+NROBOT_BASE_01$OPN_FUND_DAYS[is.na(NROBOT_BASE_01$OPN_FUND_DAYS)]<-0
+NROBOT_BASE_01$SPD_MIN_DAYS[is.na(NROBOT_BASE_01$SPD_MIN_DAYS)]<-0
+NROBOT_BASE_01$APPROP_PERSON_DAYS[is.na(NROBOT_BASE_01$APPROP_PERSON_DAYS)]<-0
+NROBOT_BASE_01$APPROP_HOUSE_DAYS[is.na(NROBOT_BASE_01$APPROP_HOUSE_DAYS)]<-0
+NROBOT_BASE_01$SPD_REC_MONTH[is.na(NROBOT_BASE_01$SPD_REC_MONTH)]<- -99
+NROBOT_BASE_01$SPD_MIN_MONTH[is.na(NROBOT_BASE_01$SPD_MIN_MONTH)]<- -99
+#--------------------
+NROBOT_BASE_VALIDATE_01$TD_AMT_01[is.na(NROBOT_BASE_VALIDATE_01$TD_AMT_04)]<-0
+NROBOT_BASE_VALIDATE_01$TD_AMT_12[is.na(NROBOT_BASE_VALIDATE_01$TD_AMT_03)]<-0
+NROBOT_BASE_VALIDATE_01$TD_AMT_11[is.na(NROBOT_BASE_VALIDATE_01$TD_AMT_02)]<-0
+NROBOT_BASE_VALIDATE_01$OPN_SAV_DAYS[is.na(NROBOT_BASE_VALIDATE_01$OPN_SAV_DAYS)]<-0
+NROBOT_BASE_VALIDATE_01$TEST_KYC_DAYS[is.na(NROBOT_BASE_VALIDATE_01$TEST_KYC_DAYS)]<-0
+NROBOT_BASE_VALIDATE_01$OPN_FUND_DAYS[is.na(NROBOT_BASE_VALIDATE_01$OPN_FUND_DAYS)]<-0
+NROBOT_BASE_VALIDATE_01$SPD_MIN_DAYS[is.na(NROBOT_BASE_VALIDATE_01$SPD_MIN_DAYS)]<-0
+NROBOT_BASE_VALIDATE_01$APPROP_PERSON_DAYS[is.na(NROBOT_BASE_VALIDATE_01$APPROP_PERSON_DAYS)]<-0
+NROBOT_BASE_VALIDATE_01$APPROP_HOUSE_DAYS[is.na(NROBOT_BASE_VALIDATE_01$APPROP_HOUSE_DAYS)]<-0
+NROBOT_BASE_VALIDATE_01$SPD_REC_MONTH[is.na(NROBOT_BASE_VALIDATE_01$SPD_REC_MONTH)]<- -99
+NROBOT_BASE_VALIDATE_01$SPD_MIN_MONTH[is.na(NROBOT_BASE_VALIDATE_01$SPD_MIN_MONTH)]<- -99
+#--------------------
+NROBOT_BASE_NTRUST_01$TD_AMT_01[is.na(NROBOT_BASE_NTRUST_01$TD_AMT_01)]<-0
+NROBOT_BASE_NTRUST_01$TD_AMT_12[is.na(NROBOT_BASE_NTRUST_01$TD_AMT_12)]<-0
+NROBOT_BASE_NTRUST_01$TD_AMT_11[is.na(NROBOT_BASE_NTRUST_01$TD_AMT_11)]<-0
+NROBOT_BASE_NTRUST_01$OPN_SAV_DAYS[is.na(NROBOT_BASE_NTRUST_01$OPN_SAV_DAYS)]<-0
+NROBOT_BASE_NTRUST_01$TEST_KYC_DAYS[is.na(NROBOT_BASE_NTRUST_01$TEST_KYC_DAYS)]<-0
+NROBOT_BASE_NTRUST_01$OPN_FUND_DAYS[is.na(NROBOT_BASE_NTRUST_01$OPN_FUND_DAYS)]<-0
+NROBOT_BASE_NTRUST_01$SPD_MIN_DAYS[is.na(NROBOT_BASE_NTRUST_01$SPD_MIN_DAYS)]<-0
+NROBOT_BASE_NTRUST_01$APPROP_PERSON_DAYS[is.na(NROBOT_BASE_NTRUST_01$APPROP_PERSON_DAYS)]<-0
+NROBOT_BASE_NTRUST_01$APPROP_HOUSE_DAYS[is.na(NROBOT_BASE_NTRUST_01$APPROP_HOUSE_DAYS)]<-0
+NROBOT_BASE_NTRUST_01$SPD_REC_MONTH[is.na(NROBOT_BASE_NTRUST_01$SPD_REC_MONTH)]<- -99
+NROBOT_BASE_NTRUST_01$SPD_MIN_MONTH[is.na(NROBOT_BASE_NTRUST_01$SPD_MIN_MONTH)]<- -99
+NROBOT_BASE_NTRUST_01$OPN_TRUST_DAYS[is.na(NROBOT_BASE_NTRUST_01$OPN_TRUST_DAYS)]<- 0
+
+
+#衍生變數
+NROBOT_BASE_01$AUM <-  NROBOT_BASE_01$NTD_AMT_01 + NROBOT_BASE_01$TD_AMT_01 +NROBOT_BASE_01$FUND_AUM #總資產
+NROBOT_BASE_01$PB_AMT_1M_DIF <-  NROBOT_BASE_01$NTD_AMT_01 - NROBOT_BASE_01$NTD_AMT_12 #本月活存變化
+NROBOT_BASE_01$PB_AMT_L1M_DIF <- NROBOT_BASE_01$NTD_AMT_12 - NROBOT_BASE_01$NTD_AMT_11 #上月活存變化
+NROBOT_BASE_01$PB_AMT_2M_DIF_AVG <- (NROBOT_BASE_01$PB_AMT_1M_DIF + NROBOT_BASE_01$PB_AMT_L1M_DIF)/2 #近2個月平均活存變化
+#--------------------
+NROBOT_BASE_NTRUST_01$AUM <-  NROBOT_BASE_NTRUST_01$NTD_AMT_01 + NROBOT_BASE_NTRUST_01$TD_AMT_01 +NROBOT_BASE_NTRUST_01$FUND_AUM #總資產
+NROBOT_BASE_NTRUST_01$PB_AMT_1M_DIF <-  NROBOT_BASE_NTRUST_01$NTD_AMT_01 - NROBOT_BASE_NTRUST_01$NTD_AMT_12 #本月活存變化
+NROBOT_BASE_NTRUST_01$PB_AMT_L1M_DIF <- NROBOT_BASE_NTRUST_01$NTD_AMT_12 - NROBOT_BASE_NTRUST_01$NTD_AMT_11 #上月活存變化
+NROBOT_BASE_NTRUST_01$PB_AMT_2M_DIF_AVG <- (NROBOT_BASE_NTRUST_01$PB_AMT_1M_DIF + NROBOT_BASE_NTRUST_01$PB_AMT_L1M_DIF)/2 #近2個月平均活存變化
+
+
+# 個案CHECK
+NROBOT_BASE_01[NROBOT_BASE_01$CIF_NO==1000000395,c(53:60,76,278,279,280,281)]
+
+
+
+#訓練/測試集
+#取得總筆數
+n <- nrow(NROBOT_BASE_01)
+#設定隨機數種子
+set.seed(1117)
+#將數據順序重新排列
+NROBOT_BASE_01 <- NROBOT_BASE_01[sample(n),]
+#維持Y的比例抽樣訓練/測試集(80%:20%)
+install.packages("caret")
+library(caret)
+Index<-createDataPartition(y=NROBOT_BASE_01$TARGET,time=1,p=0.8,list=FALSE)
+NROBOT_train<-NROBOT_BASE_01[Index,]
+NROBOT_test <-NROBOT_BASE_01[-Index,]
+
+table(NROBOT_BASE_01$TARGET)
+table(NROBOT_train$TARGET)
+table(NROBOT_test$TARGET)
+prop.table(table(NROBOT_BASE_01$TARGET))
+prop.table(table(NROBOT_train$TARGET))
+prop.table(table(NROBOT_test$TARGET))
+
+
+#under sampling Y=0(約1:4)
+#trainSplit_n = trainSplit[which(trainSplit$Y==0),]
+#ind = sample(2, nrow(trainSplit_n ), replace=TRUE, prob=c(0.1,0.8))
+#trainSplit_n_final = trainSplit_n[which(ind==1),]
+#trainSplit_final = rbind(trainSplit[which(trainSplit$Y==1),],trainSplit_n_final)
+#table(trainSplit_final$Y)
+#head(trainSplit_final[,c(1:60,138,140:181)])
+
+
+
+#計算IV值(訓練集)
+#====================================================================
+#方法一
+#--------------------------
+#Auto binning 自訂函數
+#--------------------------
+library(smbinning)
+autobin_fin <- function(data, target, min_part) {
+  results <- list()
+  for (i in 1:length(data)) {
+    if (colnames(data[i]) != target) {
+      if (class(data[[i]]) == "factor") {
+        colname <- colnames(data[i])
+        print(colname)
+        result <- smbinning.factor(df = data, y = target, x = colname)
+        results[[colname]] <- result
+      } else {
+        colname <- colnames(data[i])
+        print(colname)
+        result <- smbinning(df = data, y = target, x = colname, p = min_part)
+        results[[colname]] <- result
+      }
+    }
+  }
+  return(results)
+}
+
+#給定值
+bin01 <- autobin_fin(NROBOT_BASE_01[,c(2,6:12,14,17:53,55:60,62,64,67,70,72,74,84,85,90,91,92,97,98,176,178,182:281)],"TARGET", 0.01)
+
+#-------------
+#Get IV list
+#-------------
+iv_list <- function(result) {
+  cnt = 1
+  iv_vector <- c()
+  iv_name <- c()
+  for (i in 1:length(result)) {
+    if (class(result[[i]]) == "list") {
+      iv_name[cnt] <- result[[i]]$x
+      iv_vector[cnt] <- result[[i]]$iv
+      cnt <- cnt + 1
+    }
+  }
+  iv_value = data.frame(iv_name,iv_vector)
+}
+
+#給定值
+iv_auto = iv_list(bin01)
+
+#woe result & 繪圖
+bin01$thr_time_sum
+smbinning.plot(bin01$AUM,option="WoE",sub="AUM") 
+
+
+
+#====================================================================
+#方法二
+#-----------------------------------------------------
+#5等分 自訂函數(x若為連續，不能有遺漏值，必須先補零)
+#-----------------------------------------------------
+library(woe)
+quantile_bin <- function(data, target, quantile) {
+  results <- list()
+  for (i in 1:length(data)) {
+    if (colnames(data[i]) != target) {
+      if (class(data[[i]]) == "factor") {
+        colname <- colnames(data[i])
+        print(colname)
+        result <- woe(Data = data, Independent=colname, Continuous=FALSE, Dependent=target, C_Bin=quantile,Bad=0,Good=1)
+        results[[colname]] <- result
+      } else {
+        colname <- colnames(data[i])
+        print(colname)
+        result <- woe(Data = data, Independent=colname, Continuous=TRUE, Dependent=target, C_Bin=quantile,Bad=0,Good=1)
+        results[[colname]] <- result
+      }
+    }
+  }
+  return(results)
+}
+
+#給定值
+binq01 <- quantile_bin(NROBOT_train[,c(2,6:12,14,17:53,55:60,62,64,67,70,72,74,84,85,90,91,92,97,98,176,178,182:281)],"TARGET", 6)
+
+#-------------
+#Get IV list
+#-------------
+iv_list <- function(result) {
+  cnt = 1
+  iv_vector <- c()
+  iv_name <- c(colnames(NROBOT_train[,c(6:12,14,17:53,55:60,62,64,67,70,72,74,84,85,90,91,92,97,98,176,178,182:281)]))
+  for (i in 1:length(result)) {
+      result[[i]]$IV[is.infinite(result[[i]]$IV)]<-0
+      result[[i]]$IV[is.na(result[[i]]$IV)]<-0
+      iv_vector[cnt] <- sum(result[[i]]$IV)
+      cnt <- cnt + 1
+  }
+  iv_value = data.frame(iv_name,iv_vector)
+}
+
+#給定值
+iv_quan = iv_list(binq01)
+
+
+#woe result 
+binq01$PPC_NO3
+binq01[[40]]
+binq01$PPC_NO3$IV
+binq01[[43]]$IV
+
+
+#-------------
+#繪圖
+#-------------
+install.packages("ggplot2")
+library(ggpubr)
+library(ggplot2)
+library(gridExtra)
+# loading the multiplot function
+source("http://peterhaschke.com/Code/multiplot.R")
+
+#test：單張畫圖
+title_name <- c(colnames(NROBOT_train[,c(6:12,14,17:53,55:60,62,64,67,70,72,74,84,85,90,91,92,97,98,176,178,182:281)]))
+no1<-
+  ggplot(binq01[[1]], aes(x = binq01[[1]]$BIN, y = binq01[[1]]$TOTAL)) + 
+  geom_bar(stat = "identity",fill = "blue", colour = "grey60",size = 0.2, alpha = 0.2)+ 
+  labs(title = title_name[1]) + 
+  labs(x = title_name[1]) +
+  labs(y = "WOE") +
+  theme(axis.text.x=element_text(angle=90,colour="black",size=10)) #X軸文字轉垂直
+no1
+
+
+no2<-
+  ggplot(binq01[[40]], aes(x = binq01[[40]]$BIN, y = binq01[[40]]$WOE)) + 
+  geom_line(size=1,color="blue") +
+  geom_point(size=2,color="blue")+
+  labs(title = title_name[40]) + 
+  labs(x = title_name[40]) +
+  labs(y = "WOE")
+no2
+
+
+no3<-
+  ggplot(binq01[[39]], aes(x = binq01[[39]]$BIN, y = binq01[[39]]$WOE)) + 
+  geom_line(size=1,color="blue") +
+  geom_point(size=2,color="blue")+
+  labs(title = title_name[39]) + 
+  labs(x = title_name[39]) +
+  labs(y = "WOE")
+no3
+
+
+binq01[[38]]
+grid.arrange(no1, no2 , no3, ncol = 2, nrow = 2) #在同一頁show多張圖
+multiplot(no1, no2, no3, cols = 10) #在同一頁show多張圖
+
+
+#將圖輸出PDF檔
+pdf("multplot.pdf")
+graphs <- list()
+cnt = 1
+title_name <- c(colnames(NROBOT_train[,c(6:12,14,17:53,55:60,62,64,67,70,72,74,84,85,90,91,92,97,98,176,178,182:281)]))
+for (i in 1:167){
+  if (class(NROBOT_train[,c(6:12,14,17:53,55:60,62,64,67,70,72,74,84,85,90,91,92,97,98,176,178,182:281)][[i]]) == "factor") {
+    p1 <- ggplot(binq01[[i]], aes(x = binq01[[i]]$BIN, y = binq01[[i]]$WOE)) + 
+          geom_bar(stat = "identity",fill = "blue", colour = "grey60",size = 0.2, alpha = 0.2)+ 
+          labs(title = title_name[i]) + 
+          labs(x = title_name[i]) +
+          labs(y = "WOE")+
+          theme(axis.text.x=element_text(angle=90,colour="black",size=10)) #X軸文字轉垂直
+    graphs[[cnt]] <- p1
+    
+  } else {
+    p1 <- ggplot(binq01[[i]], aes(x = binq01[[i]]$BIN, y = binq01[[i]]$WOE)) + 
+          geom_line(size=1,color="blue") +
+          geom_point(size=2,color="blue")+
+          labs(title = title_name[i]) + 
+          labs(x = title_name[i]) +
+          labs(y = "WOE")
+    graphs[[cnt]] <- p1
+  }
+  print(graphs[[cnt]])
+  cnt <- cnt + 1
+}
+dev.off()
+
+
+
+
+graphs <- list()
+cnt = 1
+for (i in 1:167){
+  title_name <- c(colnames(NROBOT_train[,c(6:12,14,17:53,55:60,62,64,67,70,72,74,84,85,90,91,92,97,98,176,178,182:281)]))
+  p1 <- ggplot(binq01[[i]], aes(x = binq01[[i]]$BIN, y = binq01[[i]]$WOE)) + 
+    geom_line(size=1,color="blue") +
+    geom_point(size=2,color="blue")+
+    labs(title = title_name[i]) + 
+    labs(x = title_name[i]) +
+    labs(y = "WOE")
+    graphs[[cnt]] <- p1
+    print(graphs[[cnt]])
+    cnt <- cnt + 1
+}
+
+multiplot(plotlist = graphs ,cols = 2, rows= 2) #xxx
+bin01$SPD_MIN_MONTH
+binq01$SPD_MIN_MONTH
+lines(c(binq01$thr_time_sum$WOE),type=p)
+#====================================================================
+#微調切點
+head(NROBOT_train)
+plot(NROBOT_train$total_visit)
+table(NROBOT_train$KYC_RISK_INTEND)
+head(NROBOT_train_sub)
+
+
+#數值變數
+NROBOT_train$cut_age          <- cut(NROBOT_train$AGE,c(0,30,35,40,45,Inf),labels = c(1:5)) 
+NROBOT_train$cut_thr_time_sum <- cut(NROBOT_train$thr_time_sum,c(-Inf,0,6,20,50,100,300,Inf),labels = c(1:7)) 
+NROBOT_train$cut_total_visit <-  cut(NROBOT_train$total_visit,c(-Inf,0,8,17,50,Inf),labels = c(1:5)) 
+NROBOT_train$cut_ft_time_sum <-  cut(NROBOT_train$ft_time_sum,c(-Inf,0,6,20,50,150,Inf),labels = c(1:6)) 
+NROBOT_train$cut_thr_time_avg <-  cut(NROBOT_train$thr_time_avg,c(-Inf,0,1,2,5,Inf),labels = c(1:5)) 
+NROBOT_train$cut_ft_visit <-  cut(NROBOT_train$ft_visit,c(-Inf,0,11,Inf),labels = c(1:3)) 
+NROBOT_train$cut_PB_AMT_2M_DIF_AVG <-  cut(abs(NROBOT_train$PB_AMT_2M_DIF_AVG),c(-Inf,0,1500,10000,Inf),labels = c(1:4)) 
+NROBOT_train$cut_AUM <-  cut(NROBOT_train$AUM,c(-Inf,1000,10000,100000,Inf),labels = c(1:4)) 
+NROBOT_train$cut_NTD_AMT_01 <-  cut(NROBOT_train$NTD_AMT_01,c(-Inf,1000,10000,80000,200000,Inf),labels = c(1:5))
+NROBOT_train$cut_SPD_AMT_L3M <-  cut(NROBOT_train$SPD_AMT_L3M,c(-Inf,0,1000,3000,Inf),labels = c(1:4)) 
+NROBOT_train$cut_PB_AMT_L1M_DIF <-  cut(abs(NROBOT_train$PB_AMT_L1M_DIF),c(-Inf,0,1500,10000,Inf),labels = c(1:4)) 
+NROBOT_train$cut_SPD_AMT_3M_21 <-  cut(NROBOT_train$SPD_AMT_3M_21,c(-Inf,500,3000,Inf),labels = c(1:3)) 
+NROBOT_train$cut_SPD_CNT_3M_ONLINE <-  cut(NROBOT_train$SPD_CNT_3M_ONLINE,c(-Inf,0,15,Inf),labels = c(1:3)) 
+NROBOT_train$cut_SPD_AMT_L2M <-  cut(NROBOT_train$SPD_AMT_L2M,c(-Inf,0,1000,3000,12000,Inf),labels = c(1:5)) 
+NROBOT_train$cut_SPD_REC_MONTH <-  cut(NROBOT_train$SPD_REC_MONTH,c(-Inf,-99,1,Inf),labels = c(1:3)) 
+NROBOT_train$cut_SPD_AMT_3M_TOTAL <-  cut(NROBOT_train$SPD_AMT_3M_TOTAL,c(-Inf,0,1000,5000,20000,Inf),labels = c(1:5))
+NROBOT_train$cut_OPN_TRUST_DAYS <-  cut(NROBOT_train$OPN_TRUST_DAYS,c(-Inf,19,90,200,Inf),labels = c(1:4)) 
+NROBOT_train$cut_SPD_MIN_DAYS <-  cut(NROBOT_train$SPD_MIN_DAYS,c(-Inf,0,30,180,270,Inf),labels = c(1:5)) 
+NROBOT_train$cut_OPN_DAYS <-  cut(NROBOT_train$OPN_DAYS,c(-Inf,100,180,240,Inf),labels = c(1:4)) 
+NROBOT_train$cut_SPD_AMT_3M_ONLINE <-  cut(NROBOT_train$SPD_AMT_3M_ONLINE,c(-Inf,0,5000,Inf),labels = c(1:3))
+NROBOT_train$cut_SPD_AMT_3M_OFFLINE <-  cut(NROBOT_train$SPD_AMT_3M_OFFLINE,c(-Inf,0,6000,Inf),labels = c(1:3))
+NROBOT_train$cut_SPD_AMT_L1M <-  cut(NROBOT_train$SPD_AMT_L1M,c(-Inf,0,1000,3000,12000,Inf),labels = c(1:5)) 
+NROBOT_train$cut_CR_TRANS_IM_OUT_AMT_L1M <-  cut(abs(NROBOT_train$CR_TRANS_IM_OUT_AMT_L1M),c(-Inf,0,30000,Inf),labels = c(1:3)) 
+NROBOT_train$cut_CR_TRANS_IM_OUT_AMT_L3M <-  cut(abs(NROBOT_train$CR_TRANS_IM_OUT_AMT_L3M),c(-Inf,0,30000,Inf),labels = c(1:3)) 
+
+
+#單一變數，調切點，算WOE，畫圖，repeat
+NROBOT_train$cut_TD_AMT_01 <-  cut(NROBOT_train$TD_AMT_01,c(-Inf,0,50000,Inf),labels = c(1:3)) 
+woe_var <- woe(NROBOT_train, "cut_SPD_AMT_L1M", Continuous=FALSE, "TARGET", 6,Bad=0,Good=1)
+Plot_age1<-
+  ggplot(woe_var, aes(x = woe_var$BIN, y = woe_var$TOTAL)) + 
+  geom_bar(stat = "identity",fill = "blue", colour = "grey60",size = 0.2, alpha = 0.2)+ 
+  labs(title = "cut_age") + 
+  labs(x = "cut_age") +
+  labs(y = "TOTAL") 
+Plot_age2<-
+  ggplot(woe_var, aes(x = woe_var$BIN, y = woe_var$WOE)) + 
+  geom_bar(stat = "identity",fill = "blue", colour = "grey60",size = 0.2, alpha = 0.2)+ 
+  labs(title = "cut_age") + 
+  labs(x = "cut_age") +
+  labs(y = "WOE") 
+#multiplot(Plot_age1, Plot_age2,  cols = 2) #在同一頁show多張圖
+grid.arrange(Plot_age1, Plot_age2 , ncol = 2, nrow = 1) #在同一頁show多張圖
+woe_var
+sum(woe_var$IV)
+
+
+
+#類別變數合併
+NROBOT_train$RE_KYC_RISK_INTEND <- 0
+NROBOT_train$RE_KYC_RISK_INTEND[NROBOT_train$KYC_RISK_INTEND =="儘量避免損失"]<-1
+NROBOT_train$RE_KYC_RISK_INTEND[NROBOT_train$KYC_RISK_INTEND =="偏好穩定收益"]<-2
+NROBOT_train$RE_KYC_RISK_INTEND[NROBOT_train$KYC_RISK_INTEND =="追求潛力報酬"]<-3
+NROBOT_train$RE_KYC_RISK_INTEND[NROBOT_train$KYC_RISK_INTEND =="追求積極獲利"]<-4
+
+NROBOT_train$RE_KYC_ROI_EXP <- 0
+NROBOT_train$RE_KYC_ROI_EXP[NROBOT_train$KYC_ROI_EXP =="-5%~+5%"]<-1
+NROBOT_train$RE_KYC_ROI_EXP[NROBOT_train$KYC_ROI_EXP =="-10%~+10%"]<-2
+NROBOT_train$RE_KYC_ROI_EXP[NROBOT_train$KYC_ROI_EXP =="-20%~+20%"]<-3
+NROBOT_train$RE_KYC_ROI_EXP[NROBOT_train$KYC_ROI_EXP =="-30%~+30%"]<-4
+
+NROBOT_train$RE_KYC_INV_PERIOD <- 0
+NROBOT_train$RE_KYC_INV_PERIOD[NROBOT_train$KYC_INV_PERIOD =="未滿6個月"]<-1
+NROBOT_train$RE_KYC_INV_PERIOD[NROBOT_train$KYC_INV_PERIOD =="6個月(含)以上，未滿1年"]<-2
+NROBOT_train$RE_KYC_INV_PERIOD[NROBOT_train$KYC_INV_PERIOD =="1年(含)以上-未滿3年"]<-3
+NROBOT_train$RE_KYC_INV_PERIOD[NROBOT_train$KYC_INV_PERIOD =="3年(含)以上"]<-4
+
+NROBOT_train$RE_KYC_LOST_ACT <- 0
+NROBOT_train$RE_KYC_LOST_ACT[NROBOT_train$KYC_LOST_ACT =="認賠全部賣掉"]<-1
+NROBOT_train$RE_KYC_LOST_ACT[NROBOT_train$KYC_LOST_ACT =="賣出一部份"]<-2
+NROBOT_train$RE_KYC_LOST_ACT[NROBOT_train$KYC_LOST_ACT =="再觀察一陣子"]<-3
+NROBOT_train$RE_KYC_LOST_ACT[NROBOT_train$KYC_LOST_ACT =="把握機會趁機加碼入市"]<-4
+
+NROBOT_train$RE_KYC_INV_EXP <- 0
+NROBOT_train$RE_KYC_INV_EXP[NROBOT_train$KYC_INV_EXP =="1年(含)以下"]<-1
+NROBOT_train$RE_KYC_INV_EXP[NROBOT_train$KYC_INV_EXP =="1年以上-3年(含)以下"]<-2
+NROBOT_train$RE_KYC_INV_EXP[NROBOT_train$KYC_INV_EXP =="3年以上- 5年(含)以下"]<-3
+NROBOT_train$RE_KYC_INV_EXP[NROBOT_train$KYC_INV_EXP =="5年以上"]<-4
+
+NROBOT_train$RE_KYC_AVAILABLE_AMT <- 0
+NROBOT_train$RE_KYC_AVAILABLE_AMT[NROBOT_train$KYC_AVAILABLE_AMT =="5仟(含)以下"]<-1
+NROBOT_train$RE_KYC_AVAILABLE_AMT[NROBOT_train$KYC_AVAILABLE_AMT =="5仟~1萬(含)"]<-2
+NROBOT_train$RE_KYC_AVAILABLE_AMT[NROBOT_train$KYC_AVAILABLE_AMT =="1萬~5萬(含)"]<-3
+NROBOT_train$RE_KYC_AVAILABLE_AMT[NROBOT_train$KYC_AVAILABLE_AMT =="5萬元以上"]<-4
+
+NROBOT_train$RE_KYC_SALARY <- 0
+NROBOT_train$RE_KYC_SALARY[NROBOT_train$KYC_SALARY =="未達50萬元"]<-1
+NROBOT_train$RE_KYC_SALARY[NROBOT_train$KYC_SALARY =="50萬(含)~100萬元"]<-2
+NROBOT_train$RE_KYC_SALARY[NROBOT_train$KYC_SALARY =="100萬(含)~150萬元"]<-3
+NROBOT_train$RE_KYC_SALARY[NROBOT_train$KYC_SALARY =="150萬元(含)以上"]<-4
+
+NROBOT_train$RE_CHNL <- 0
+NROBOT_train$RE_CHNL[NROBOT_train$CHNL =="1.員工開戶"]<-1
+NROBOT_train$RE_CHNL[NROBOT_train$CHNL =="2.薪轉開發"]<-2
+NROBOT_train$RE_CHNL[NROBOT_train$CHNL =="3.揪團開戶"]<-3
+NROBOT_train$RE_CHNL[NROBOT_train$CHNL =="4.推薦開戶"]<-4
+NROBOT_train$RE_CHNL[NROBOT_train$CHNL =="5.分行開戶"]<-5
+NROBOT_train$RE_CHNL[NROBOT_train$CHNL =="6.行銷活動"]<-6
+NROBOT_train$RE_CHNL[NROBOT_train$CHNL =="7.自來案件"]<-7
+
+NROBOT_train$RE_KYC_CHILD_CNT <- -99
+NROBOT_train$RE_KYC_CHILD_CNT[NROBOT_train$KYC_CHILD_CNT =="0"]<-0
+NROBOT_train$RE_KYC_CHILD_CNT[NROBOT_train$KYC_CHILD_CNT =="1"]<-1
+NROBOT_train$RE_KYC_CHILD_CNT[NROBOT_train$KYC_CHILD_CNT =="2"]<-1
+NROBOT_train$RE_KYC_CHILD_CNT[NROBOT_train$KYC_CHILD_CNT =="3"]<-1
+
+NROBOT_train$RE_KYC_EVER_TDFD <- -99
+NROBOT_train$RE_KYC_EVER_TDFD[NROBOT_train$KYC_EVER_TDFD =="N"]<-0
+NROBOT_train$RE_KYC_EVER_TDFD[NROBOT_train$KYC_EVER_TDFD =="Y"]<-1
+
+NROBOT_train$RE_KYC_EVER_STOCK <- -99
+NROBOT_train$RE_KYC_EVER_STOCK[NROBOT_train$KYC_EVER_STOCK =="N"]<-0
+NROBOT_train$RE_KYC_EVER_STOCK[NROBOT_train$KYC_EVER_STOCK =="Y"]<-1
+
+NROBOT_train$RE_KYC_FR_REST <- -99
+NROBOT_train$RE_KYC_FR_REST[NROBOT_train$KYC_FR_REST =="N"]<-0
+NROBOT_train$RE_KYC_FR_REST[NROBOT_train$KYC_FR_REST =="Y"]<-1
+
+
+table(NROBOT_train$KYC_FR_REST)
+class(NROBOT_train$KYC_ROI_EXP)
+
+
+#指定FACTOR變數
+NROBOT_train$RE_KYC_RISK_INTEND <- as.factor(NROBOT_train$RE_KYC_RISK_INTEND)
+NROBOT_train$RE_KYC_ROI_EXP <- as.factor(NROBOT_train$RE_KYC_ROI_EXP)
+NROBOT_train$RE_KYC_INV_PERIOD <- as.factor(NROBOT_train$RE_KYC_INV_PERIOD)
+NROBOT_train$RE_KYC_LOST_ACT <- as.factor(NROBOT_train$RE_KYC_LOST_ACT)
+NROBOT_train$RE_KYC_INV_EXP <- as.factor(NROBOT_train$RE_KYC_INV_EXP)
+NROBOT_train$RE_KYC_AVAILABLE_AMT <- as.factor(NROBOT_train$RE_KYC_AVAILABLE_AMT)
+NROBOT_train$RE_KYC_SALARY <- as.factor(NROBOT_train$RE_KYC_SALARY)
+NROBOT_train$RE_CHNL <- as.factor(NROBOT_train$RE_CHNL)
+NROBOT_train$RE_KYC_CHILD_CNT <- as.factor(NROBOT_train$RE_KYC_CHILD_CNT)
+NROBOT_train$RE_KYC_EVER_TDFD <- as.factor(NROBOT_train$RE_KYC_EVER_TDFD)
+NROBOT_train$RE_KYC_EVER_STOCK <- as.factor(NROBOT_train$RE_KYC_EVER_STOCK)
+NROBOT_train$RE_KYC_FR_REST <- as.factor(NROBOT_train$RE_KYC_FR_REST)
+class(NROBOT_train$RE_KYC_FR_REST)
+
+library(dplyr)
+#訓練資料
+NROBOT_train_sub =select(NROBOT_train, TARGET,total_visit,AUM,thr_time_avg,SPD_MIN_DAYS,SPD_REC_MONTH,
+                        cut_thr_time_sum,
+                        cut_total_visit,
+                        cut_ft_time_sum,
+                        cut_thr_time_avg,
+                        cut_ft_visit,
+                        cut_PB_AMT_2M_DIF_AVG,
+                        RISK_LEVEL,
+                        cut_AUM,
+                        FUND_EVEN,
+                        RE_KYC_ROI_EXP,
+                        RE_KYC_RISK_INTEND,
+                        cut_NTD_AMT_01,
+                        cut_SPD_AMT_L3M,
+                        cut_PB_AMT_L1M_DIF,
+                        cut_SPD_AMT_3M_21,
+                        RE_KYC_INV_PERIOD,
+                        cut_SPD_CNT_3M_ONLINE,
+                        RE_KYC_LOST_ACT,
+                        RE_KYC_INV_EXP,
+                        RE_KYC_CHILD_CNT,
+                        RE_KYC_EVER_TDFD,
+                        cut_SPD_AMT_L2M,
+                        RE_KYC_AVAILABLE_AMT,
+                        cut_SPD_REC_MONTH,
+                        cut_SPD_AMT_3M_TOTAL,
+                        cut_OPN_TRUST_DAYS,
+                        KYC_OCU,
+                        RE_KYC_EVER_STOCK,
+                        RE_KYC_FR_REST,
+                        RE_KYC_SALARY,
+                        cut_age,
+                        cut_SPD_MIN_DAYS,
+                        cut_OPN_DAYS,
+                        cut_SPD_AMT_3M_ONLINE,
+                        cut_SPD_AMT_3M_OFFLINE,
+                        cut_SPD_AMT_L1M,
+                        cut_CR_TRANS_IM_OUT_AMT_L1M,
+                        cut_CR_TRANS_IM_OUT_AMT_L3M,
+                        RE_CHNL)
+
+#====================================================================
+#測試資料
+NROBOT_test$cut_age          <- cut(NROBOT_test$AGE,c(0,30,35,40,45,Inf),labels = c(1:5)) 
+NROBOT_test$cut_thr_time_sum <- cut(NROBOT_test$thr_time_sum,c(-Inf,0,6,20,50,100,300,Inf),labels = c(1:7)) 
+NROBOT_test$cut_total_visit <-  cut(NROBOT_test$total_visit,c(-Inf,0,8,17,50,Inf),labels = c(1:5)) 
+NROBOT_test$cut_ft_time_sum <-  cut(NROBOT_test$ft_time_sum,c(-Inf,0,6,20,50,150,Inf),labels = c(1:6)) 
+NROBOT_test$cut_thr_time_avg <-  cut(NROBOT_test$thr_time_avg,c(-Inf,0,1,2,5,Inf),labels = c(1:5)) 
+NROBOT_test$cut_ft_visit <-  cut(NROBOT_test$ft_visit,c(-Inf,0,11,Inf),labels = c(1:3)) 
+NROBOT_test$cut_PB_AMT_2M_DIF_AVG <-  cut(abs(NROBOT_test$PB_AMT_2M_DIF_AVG),c(-Inf,0,1500,10000,Inf),labels = c(1:4)) 
+NROBOT_test$cut_AUM <-  cut(NROBOT_test$AUM,c(-Inf,1000,10000,100000,Inf),labels = c(1:4)) 
+NROBOT_test$cut_NTD_AMT_01 <-  cut(NROBOT_test$NTD_AMT_01,c(-Inf,1000,10000,80000,200000,Inf),labels = c(1:5))
+NROBOT_test$cut_SPD_AMT_L3M <-  cut(NROBOT_test$SPD_AMT_L3M,c(-Inf,0,1000,3000,Inf),labels = c(1:4)) 
+NROBOT_test$cut_PB_AMT_L1M_DIF <-  cut(abs(NROBOT_test$PB_AMT_L1M_DIF),c(-Inf,0,1500,10000,Inf),labels = c(1:4)) 
+NROBOT_test$cut_SPD_AMT_3M_21 <-  cut(NROBOT_test$SPD_AMT_3M_21,c(-Inf,500,3000,Inf),labels = c(1:3)) 
+NROBOT_test$cut_SPD_CNT_3M_ONLINE <-  cut(NROBOT_test$SPD_CNT_3M_ONLINE,c(-Inf,0,15,Inf),labels = c(1:3)) 
+NROBOT_test$cut_SPD_AMT_L2M <-  cut(NROBOT_test$SPD_AMT_L2M,c(-Inf,0,1000,3000,12000,Inf),labels = c(1:5)) 
+NROBOT_test$cut_SPD_REC_MONTH <-  cut(NROBOT_test$SPD_REC_MONTH,c(-Inf,-99,1,Inf),labels = c(1:3)) 
+NROBOT_test$cut_SPD_AMT_3M_TOTAL <-  cut(NROBOT_test$SPD_AMT_3M_TOTAL,c(-Inf,0,1000,5000,20000,Inf),labels = c(1:5))
+NROBOT_test$cut_OPN_TRUST_DAYS <-  cut(NROBOT_test$OPN_TRUST_DAYS,c(-Inf,19,90,200,Inf),labels = c(1:4)) 
+NROBOT_test$cut_SPD_MIN_DAYS <-  cut(NROBOT_test$SPD_MIN_DAYS,c(-Inf,0,30,180,270,Inf),labels = c(1:5)) 
+NROBOT_test$cut_OPN_DAYS <-  cut(NROBOT_test$OPN_DAYS,c(-Inf,100,180,240,Inf),labels = c(1:4)) 
+NROBOT_test$cut_SPD_AMT_3M_ONLINE <-  cut(NROBOT_test$SPD_AMT_3M_ONLINE,c(-Inf,0,5000,Inf),labels = c(1:3))
+NROBOT_test$cut_SPD_AMT_3M_OFFLINE <-  cut(NROBOT_test$SPD_AMT_3M_OFFLINE,c(-Inf,0,6000,Inf),labels = c(1:3))
+NROBOT_test$cut_SPD_AMT_L1M <-  cut(NROBOT_test$SPD_AMT_L1M,c(-Inf,0,1000,3000,12000,Inf),labels = c(1:5)) 
+NROBOT_test$cut_CR_TRANS_IM_OUT_AMT_L1M <-  cut(abs(NROBOT_test$CR_TRANS_IM_OUT_AMT_L1M),c(-Inf,0,30000,Inf),labels = c(1:3)) 
+NROBOT_test$cut_CR_TRANS_IM_OUT_AMT_L3M <-  cut(abs(NROBOT_test$CR_TRANS_IM_OUT_AMT_L3M),c(-Inf,0,30000,Inf),labels = c(1:3)) 
+
+table(NROBOT_test_sub$CHNL)
+table(NROBOT_test_sub$CHNL)
+
+
+#類別變數合併
+NROBOT_test$RE_KYC_RISK_INTEND <- 0
+NROBOT_test$RE_KYC_RISK_INTEND[NROBOT_test$KYC_RISK_INTEND =="儘量避免損失"]<-1
+NROBOT_test$RE_KYC_RISK_INTEND[NROBOT_test$KYC_RISK_INTEND =="偏好穩定收益"]<-2
+NROBOT_test$RE_KYC_RISK_INTEND[NROBOT_test$KYC_RISK_INTEND =="追求潛力報酬"]<-3
+NROBOT_test$RE_KYC_RISK_INTEND[NROBOT_test$KYC_RISK_INTEND =="追求積極獲利"]<-4
+
+NROBOT_test$RE_KYC_ROI_EXP <- 0
+NROBOT_test$RE_KYC_ROI_EXP[NROBOT_test$KYC_ROI_EXP =="-5%~+5%"]<-1
+NROBOT_test$RE_KYC_ROI_EXP[NROBOT_test$KYC_ROI_EXP =="-10%~+10%"]<-2
+NROBOT_test$RE_KYC_ROI_EXP[NROBOT_test$KYC_ROI_EXP =="-20%~+20%"]<-3
+NROBOT_test$RE_KYC_ROI_EXP[NROBOT_test$KYC_ROI_EXP =="-30%~+30%"]<-4
+
+NROBOT_test$RE_KYC_INV_PERIOD <- 0
+NROBOT_test$RE_KYC_INV_PERIOD[NROBOT_test$KYC_INV_PERIOD =="未滿6個月"]<-1
+NROBOT_test$RE_KYC_INV_PERIOD[NROBOT_test$KYC_INV_PERIOD =="6個月(含)以上，未滿1年"]<-2
+NROBOT_test$RE_KYC_INV_PERIOD[NROBOT_test$KYC_INV_PERIOD =="1年(含)以上-未滿3年"]<-3
+NROBOT_test$RE_KYC_INV_PERIOD[NROBOT_test$KYC_INV_PERIOD =="3年(含)以上"]<-4
+
+NROBOT_test$RE_KYC_LOST_ACT <- 0
+NROBOT_test$RE_KYC_LOST_ACT[NROBOT_test$KYC_LOST_ACT =="認賠全部賣掉"]<-1
+NROBOT_test$RE_KYC_LOST_ACT[NROBOT_test$KYC_LOST_ACT =="賣出一部份"]<-2
+NROBOT_test$RE_KYC_LOST_ACT[NROBOT_test$KYC_LOST_ACT =="再觀察一陣子"]<-3
+NROBOT_test$RE_KYC_LOST_ACT[NROBOT_test$KYC_LOST_ACT =="把握機會趁機加碼入市"]<-4
+
+NROBOT_test$RE_KYC_INV_EXP <- 0
+NROBOT_test$RE_KYC_INV_EXP[NROBOT_test$KYC_INV_EXP =="1年(含)以下"]<-1
+NROBOT_test$RE_KYC_INV_EXP[NROBOT_test$KYC_INV_EXP =="1年以上-3年(含)以下"]<-2
+NROBOT_test$RE_KYC_INV_EXP[NROBOT_test$KYC_INV_EXP =="3年以上- 5年(含)以下"]<-3
+NROBOT_test$RE_KYC_INV_EXP[NROBOT_test$KYC_INV_EXP =="5年以上"]<-4
+
+NROBOT_test$RE_KYC_AVAILABLE_AMT <- 0
+NROBOT_test$RE_KYC_AVAILABLE_AMT[NROBOT_test$KYC_AVAILABLE_AMT =="5仟(含)以下"]<-1
+NROBOT_test$RE_KYC_AVAILABLE_AMT[NROBOT_test$KYC_AVAILABLE_AMT =="5仟~1萬(含)"]<-2
+NROBOT_test$RE_KYC_AVAILABLE_AMT[NROBOT_test$KYC_AVAILABLE_AMT =="1萬~5萬(含)"]<-3
+NROBOT_test$RE_KYC_AVAILABLE_AMT[NROBOT_test$KYC_AVAILABLE_AMT =="5萬元以上"]<-4
+
+NROBOT_test$RE_KYC_SALARY <- 0
+NROBOT_test$RE_KYC_SALARY[NROBOT_test$KYC_SALARY =="未達50萬元"]<-1
+NROBOT_test$RE_KYC_SALARY[NROBOT_test$KYC_SALARY =="50萬(含)~100萬元"]<-2
+NROBOT_test$RE_KYC_SALARY[NROBOT_test$KYC_SALARY =="100萬(含)~150萬元"]<-3
+NROBOT_test$RE_KYC_SALARY[NROBOT_test$KYC_SALARY =="150萬元(含)以上"]<-4
+
+NROBOT_test$RE_CHNL <- 0
+NROBOT_test$RE_CHNL[NROBOT_test$CHNL =="1.員工開戶"]<-1
+NROBOT_test$RE_CHNL[NROBOT_test$CHNL =="2.薪轉開發"]<-2
+NROBOT_test$RE_CHNL[NROBOT_test$CHNL =="3.揪團開戶"]<-3
+NROBOT_test$RE_CHNL[NROBOT_test$CHNL =="4.推薦開戶"]<-4
+NROBOT_test$RE_CHNL[NROBOT_test$CHNL =="5.分行開戶"]<-5
+NROBOT_test$RE_CHNL[NROBOT_test$CHNL =="6.行銷活動"]<-6
+NROBOT_test$RE_CHNL[NROBOT_test$CHNL =="7.自來案件"]<-7
+
+NROBOT_test$RE_KYC_CHILD_CNT <- -99
+NROBOT_test$RE_KYC_CHILD_CNT[NROBOT_test$KYC_CHILD_CNT =="0"]<-0
+NROBOT_test$RE_KYC_CHILD_CNT[NROBOT_test$KYC_CHILD_CNT =="1"]<-1
+NROBOT_test$RE_KYC_CHILD_CNT[NROBOT_test$KYC_CHILD_CNT =="2"]<-1
+NROBOT_test$RE_KYC_CHILD_CNT[NROBOT_test$KYC_CHILD_CNT =="3"]<-1
+
+NROBOT_test$RE_KYC_EVER_TDFD <- -99
+NROBOT_test$RE_KYC_EVER_TDFD[NROBOT_test$KYC_EVER_TDFD =="N"]<-0
+NROBOT_test$RE_KYC_EVER_TDFD[NROBOT_test$KYC_EVER_TDFD =="Y"]<-1
+
+NROBOT_test$RE_KYC_EVER_STOCK <- -99
+NROBOT_test$RE_KYC_EVER_STOCK[NROBOT_test$KYC_EVER_STOCK =="N"]<-0
+NROBOT_test$RE_KYC_EVER_STOCK[NROBOT_test$KYC_EVER_STOCK =="Y"]<-1
+
+NROBOT_test$RE_KYC_FR_REST <- -99
+NROBOT_test$RE_KYC_FR_REST[NROBOT_test$KYC_FR_REST =="N"]<-0
+NROBOT_test$RE_KYC_FR_REST[NROBOT_test$KYC_FR_REST =="Y"]<-1
+
+#指定FACTOR變數
+NROBOT_test$RE_KYC_RISK_INTEND <- as.factor(NROBOT_test$RE_KYC_RISK_INTEND)
+NROBOT_test$RE_KYC_ROI_EXP <- as.factor(NROBOT_test$RE_KYC_ROI_EXP)
+NROBOT_test$RE_KYC_INV_PERIOD <- as.factor(NROBOT_test$RE_KYC_INV_PERIOD)
+NROBOT_test$RE_KYC_LOST_ACT <- as.factor(NROBOT_test$RE_KYC_LOST_ACT)
+NROBOT_test$RE_KYC_INV_EXP <- as.factor(NROBOT_test$RE_KYC_INV_EXP)
+NROBOT_test$RE_KYC_AVAILABLE_AMT <- as.factor(NROBOT_test$RE_KYC_AVAILABLE_AMT)
+NROBOT_test$RE_KYC_SALARY <- as.factor(NROBOT_test$RE_KYC_SALARY)
+NROBOT_test$RE_CHNL <- as.factor(NROBOT_test$RE_CHNL)
+NROBOT_test$RE_KYC_CHILD_CNT <- as.factor(NROBOT_test$RE_KYC_CHILD_CNT)
+NROBOT_test$RE_KYC_EVER_TDFD <- as.factor(NROBOT_test$RE_KYC_EVER_TDFD)
+NROBOT_test$RE_KYC_EVER_STOCK <- as.factor(NROBOT_test$RE_KYC_EVER_STOCK)
+NROBOT_test$RE_KYC_FR_REST <- as.factor(NROBOT_test$RE_KYC_FR_REST)
+class(NROBOT_test$RE_KYC_FR_REST)
+
+#測試資料
+NROBOT_test_sub =select(NROBOT_test, TARGET,
+                         cut_thr_time_sum,total_visit,AUM,thr_time_avg,SPD_MIN_DAYS,SPD_REC_MONTH,
+                         cut_total_visit,
+                         cut_ft_time_sum,
+                         cut_thr_time_avg,
+                         cut_ft_visit,
+                         cut_PB_AMT_2M_DIF_AVG,
+                         RISK_LEVEL,
+                         cut_AUM,
+                         FUND_EVEN,
+                         RE_KYC_ROI_EXP,
+                         RE_KYC_RISK_INTEND,
+                         cut_NTD_AMT_01,
+                         cut_SPD_AMT_L3M,
+                         cut_PB_AMT_L1M_DIF,
+                         cut_SPD_AMT_3M_21,
+                         RE_KYC_INV_PERIOD,
+                         cut_SPD_CNT_3M_ONLINE,
+                         RE_KYC_LOST_ACT,
+                         RE_KYC_INV_EXP,
+                         RE_KYC_CHILD_CNT,
+                         RE_KYC_EVER_TDFD,
+                         cut_SPD_AMT_L2M,
+                         RE_KYC_AVAILABLE_AMT,
+                         cut_SPD_REC_MONTH,
+                         cut_SPD_AMT_3M_TOTAL,
+                         cut_OPN_TRUST_DAYS,
+                         KYC_OCU,
+                         RE_KYC_EVER_STOCK,
+                         RE_KYC_FR_REST,
+                         RE_KYC_SALARY,
+                         cut_age,
+                         cut_SPD_MIN_DAYS,
+                         cut_OPN_DAYS,
+                         cut_SPD_AMT_3M_ONLINE,
+                         cut_SPD_AMT_3M_OFFLINE,
+                         cut_SPD_AMT_L1M,
+                         cut_CR_TRANS_IM_OUT_AMT_L1M,
+                         cut_CR_TRANS_IM_OUT_AMT_L3M,
+                         RE_CHNL)
+
+#====================================================================
+#驗證資料
+NROBOT_BASE_VALIDATE_01$cut_age          <- cut(NROBOT_BASE_VALIDATE_01$AGE,c(0,30,35,40,45,Inf),labels = c(1:5)) 
+NROBOT_BASE_VALIDATE_01$cut_thr_time_sum <- cut(NROBOT_BASE_VALIDATE_01$thr_time_sum,c(-Inf,0,6,20,50,100,300,Inf),labels = c(1:7)) 
+NROBOT_BASE_VALIDATE_01$cut_total_visit <-  cut(NROBOT_BASE_VALIDATE_01$total_visit,c(-Inf,0,8,17,50,Inf),labels = c(1:5)) 
+NROBOT_BASE_VALIDATE_01$cut_ft_time_sum <-  cut(NROBOT_BASE_VALIDATE_01$ft_time_sum,c(-Inf,0,6,20,50,150,Inf),labels = c(1:6)) 
+NROBOT_BASE_VALIDATE_01$cut_thr_time_avg <-  cut(NROBOT_BASE_VALIDATE_01$thr_time_avg,c(-Inf,0,1,2,5,Inf),labels = c(1:5)) 
+NROBOT_BASE_VALIDATE_01$cut_ft_visit <-  cut(NROBOT_BASE_VALIDATE_01$ft_visit,c(-Inf,0,11,Inf),labels = c(1:3)) 
+NROBOT_BASE_VALIDATE_01$cut_PB_AMT_2M_DIF_AVG <-  cut(abs(NROBOT_BASE_VALIDATE_01$PB_AMT_2M_DIF_AVG),c(-Inf,0,1500,10000,Inf),labels = c(1:4)) 
+NROBOT_BASE_VALIDATE_01$cut_AUM <-  cut(NROBOT_BASE_VALIDATE_01$AUM,c(-Inf,1000,10000,100000,Inf),labels = c(1:4)) 
+NROBOT_BASE_VALIDATE_01$cut_NTD_AMT_01 <-  cut(NROBOT_BASE_VALIDATE_01$PB_AMT_04,c(-Inf,1000,10000,80000,200000,Inf),labels = c(1:5))
+NROBOT_BASE_VALIDATE_01$cut_SPD_AMT_L3M <-  cut(NROBOT_BASE_VALIDATE_01$SPD_AMT_L3M,c(-Inf,0,1000,3000,Inf),labels = c(1:4)) 
+NROBOT_BASE_VALIDATE_01$cut_PB_AMT_L1M_DIF <-  cut(abs(NROBOT_BASE_VALIDATE_01$PB_AMT_L1M_DIF),c(-Inf,0,1500,10000,Inf),labels = c(1:4)) 
+NROBOT_BASE_VALIDATE_01$cut_SPD_AMT_3M_21 <-  cut(NROBOT_BASE_VALIDATE_01$SPD_AMT_3M_21,c(-Inf,500,3000,Inf),labels = c(1:3)) 
+NROBOT_BASE_VALIDATE_01$cut_SPD_CNT_3M_ONLINE <-  cut(NROBOT_BASE_VALIDATE_01$SPD_CNT_3M_ONLINE,c(-Inf,0,15,Inf),labels = c(1:3)) 
+NROBOT_BASE_VALIDATE_01$cut_SPD_AMT_L2M <-  cut(NROBOT_BASE_VALIDATE_01$SPD_AMT_L2M,c(-Inf,0,1000,3000,12000,Inf),labels = c(1:5)) 
+NROBOT_BASE_VALIDATE_01$cut_SPD_REC_MONTH <-  cut(NROBOT_BASE_VALIDATE_01$SPD_REC_MONTH,c(-Inf,-99,1,Inf),labels = c(1:3)) 
+NROBOT_BASE_VALIDATE_01$cut_SPD_AMT_3M_TOTAL <-  cut(NROBOT_BASE_VALIDATE_01$SPD_AMT_3M_TOTAL,c(-Inf,0,1000,5000,20000,Inf),labels = c(1:5))
+NROBOT_BASE_VALIDATE_01$cut_OPN_TRUST_DAYS <-  cut(NROBOT_BASE_VALIDATE_01$OPN_TRUST_DAYS,c(-Inf,19,90,200,Inf),labels = c(1:4)) 
+NROBOT_BASE_VALIDATE_01$cut_SPD_MIN_DAYS <-  cut(NROBOT_BASE_VALIDATE_01$SPD_MIN_DAYS,c(-Inf,0,30,180,270,Inf),labels = c(1:5)) 
+NROBOT_BASE_VALIDATE_01$cut_OPN_DAYS <-  cut(NROBOT_BASE_VALIDATE_01$OPN_DAYS,c(-Inf,100,180,240,Inf),labels = c(1:4)) 
+NROBOT_BASE_VALIDATE_01$cut_SPD_AMT_3M_ONLINE <-  cut(NROBOT_BASE_VALIDATE_01$SPD_AMT_3M_ONLINE,c(-Inf,0,5000,Inf),labels = c(1:3))
+NROBOT_BASE_VALIDATE_01$cut_SPD_AMT_3M_OFFLINE <-  cut(NROBOT_BASE_VALIDATE_01$SPD_AMT_3M_OFFLINE,c(-Inf,0,6000,Inf),labels = c(1:3))
+NROBOT_BASE_VALIDATE_01$cut_SPD_AMT_L1M <-  cut(NROBOT_BASE_VALIDATE_01$SPD_AMT_L1M,c(-Inf,0,1000,3000,12000,Inf),labels = c(1:5)) 
+NROBOT_BASE_VALIDATE_01$cut_CR_TRANS_IM_OUT_AMT_L1M <-  cut(abs(NROBOT_BASE_VALIDATE_01$CR_TRANS_IM_OUT_AMT_L1M),c(-Inf,0,30000,Inf),labels = c(1:3)) 
+NROBOT_BASE_VALIDATE_01$cut_CR_TRANS_IM_OUT_AMT_L3M <-  cut(abs(NROBOT_BASE_VALIDATE_01$CR_TRANS_IM_OUT_AMT_L3M),c(-Inf,0,30000,Inf),labels = c(1:3)) 
+
+table(NROBOT_test_sub$CHNL)
+table(NROBOT_test_sub$CHNL)
+
+
+#類別變數合併
+NROBOT_BASE_VALIDATE_01$RE_KYC_RISK_INTEND <- 0
+NROBOT_BASE_VALIDATE_01$RE_KYC_RISK_INTEND[NROBOT_BASE_VALIDATE_01$KYC_RISK_INTEND =="儘量避免損失"]<-1
+NROBOT_BASE_VALIDATE_01$RE_KYC_RISK_INTEND[NROBOT_BASE_VALIDATE_01$KYC_RISK_INTEND =="偏好穩定收益"]<-2
+NROBOT_BASE_VALIDATE_01$RE_KYC_RISK_INTEND[NROBOT_BASE_VALIDATE_01$KYC_RISK_INTEND =="追求潛力報酬"]<-3
+NROBOT_BASE_VALIDATE_01$RE_KYC_RISK_INTEND[NROBOT_BASE_VALIDATE_01$KYC_RISK_INTEND =="追求積極獲利"]<-4
+
+NROBOT_BASE_VALIDATE_01$RE_KYC_ROI_EXP <- 0
+NROBOT_BASE_VALIDATE_01$RE_KYC_ROI_EXP[NROBOT_BASE_VALIDATE_01$KYC_ROI_EXP =="-5%~+5%"]<-1
+NROBOT_BASE_VALIDATE_01$RE_KYC_ROI_EXP[NROBOT_BASE_VALIDATE_01$KYC_ROI_EXP =="-10%~+10%"]<-2
+NROBOT_BASE_VALIDATE_01$RE_KYC_ROI_EXP[NROBOT_BASE_VALIDATE_01$KYC_ROI_EXP =="-20%~+20%"]<-3
+NROBOT_BASE_VALIDATE_01$RE_KYC_ROI_EXP[NROBOT_BASE_VALIDATE_01$KYC_ROI_EXP =="-30%~+30%"]<-4
+
+NROBOT_BASE_VALIDATE_01$RE_KYC_INV_PERIOD <- 0
+NROBOT_BASE_VALIDATE_01$RE_KYC_INV_PERIOD[NROBOT_BASE_VALIDATE_01$KYC_INV_PERIOD =="未滿6個月"]<-1
+NROBOT_BASE_VALIDATE_01$RE_KYC_INV_PERIOD[NROBOT_BASE_VALIDATE_01$KYC_INV_PERIOD =="6個月(含)以上，未滿1年"]<-2
+NROBOT_BASE_VALIDATE_01$RE_KYC_INV_PERIOD[NROBOT_BASE_VALIDATE_01$KYC_INV_PERIOD =="1年(含)以上-未滿3年"]<-3
+NROBOT_BASE_VALIDATE_01$RE_KYC_INV_PERIOD[NROBOT_BASE_VALIDATE_01$KYC_INV_PERIOD =="3年(含)以上"]<-4
+
+NROBOT_BASE_VALIDATE_01$RE_KYC_LOST_ACT <- 0
+NROBOT_BASE_VALIDATE_01$RE_KYC_LOST_ACT[NROBOT_BASE_VALIDATE_01$KYC_LOST_ACT =="認賠全部賣掉"]<-1
+NROBOT_BASE_VALIDATE_01$RE_KYC_LOST_ACT[NROBOT_BASE_VALIDATE_01$KYC_LOST_ACT =="賣出一部份"]<-2
+NROBOT_BASE_VALIDATE_01$RE_KYC_LOST_ACT[NROBOT_BASE_VALIDATE_01$KYC_LOST_ACT =="再觀察一陣子"]<-3
+NROBOT_BASE_VALIDATE_01$RE_KYC_LOST_ACT[NROBOT_BASE_VALIDATE_01$KYC_LOST_ACT =="把握機會趁機加碼入市"]<-4
+
+NROBOT_BASE_VALIDATE_01$RE_KYC_INV_EXP <- 0
+NROBOT_BASE_VALIDATE_01$RE_KYC_INV_EXP[NROBOT_BASE_VALIDATE_01$KYC_INV_EXP =="1年(含)以下"]<-1
+NROBOT_BASE_VALIDATE_01$RE_KYC_INV_EXP[NROBOT_BASE_VALIDATE_01$KYC_INV_EXP =="1年以上-3年(含)以下"]<-2
+NROBOT_BASE_VALIDATE_01$RE_KYC_INV_EXP[NROBOT_BASE_VALIDATE_01$KYC_INV_EXP =="3年以上- 5年(含)以下"]<-3
+NROBOT_BASE_VALIDATE_01$RE_KYC_INV_EXP[NROBOT_BASE_VALIDATE_01$KYC_INV_EXP =="5年以上"]<-4
+
+NROBOT_BASE_VALIDATE_01$RE_KYC_AVAILABLE_AMT <- 0
+NROBOT_BASE_VALIDATE_01$RE_KYC_AVAILABLE_AMT[NROBOT_BASE_VALIDATE_01$KYC_AVAILABLE_AMT =="5仟(含)以下"]<-1
+NROBOT_BASE_VALIDATE_01$RE_KYC_AVAILABLE_AMT[NROBOT_BASE_VALIDATE_01$KYC_AVAILABLE_AMT =="5仟~1萬(含)"]<-2
+NROBOT_BASE_VALIDATE_01$RE_KYC_AVAILABLE_AMT[NROBOT_BASE_VALIDATE_01$KYC_AVAILABLE_AMT =="1萬~5萬(含)"]<-3
+NROBOT_BASE_VALIDATE_01$RE_KYC_AVAILABLE_AMT[NROBOT_BASE_VALIDATE_01$KYC_AVAILABLE_AMT =="5萬元以上"]<-4
+
+NROBOT_BASE_VALIDATE_01$RE_KYC_SALARY <- 0
+NROBOT_BASE_VALIDATE_01$RE_KYC_SALARY[NROBOT_BASE_VALIDATE_01$KYC_SALARY =="未達50萬元"]<-1
+NROBOT_BASE_VALIDATE_01$RE_KYC_SALARY[NROBOT_BASE_VALIDATE_01$KYC_SALARY =="50萬(含)~100萬元"]<-2
+NROBOT_BASE_VALIDATE_01$RE_KYC_SALARY[NROBOT_BASE_VALIDATE_01$KYC_SALARY =="100萬(含)~150萬元"]<-3
+NROBOT_BASE_VALIDATE_01$RE_KYC_SALARY[NROBOT_BASE_VALIDATE_01$KYC_SALARY =="150萬元(含)以上"]<-4
+
+NROBOT_BASE_VALIDATE_01$RE_CHNL <- 0
+NROBOT_BASE_VALIDATE_01$RE_CHNL[NROBOT_BASE_VALIDATE_01$CHNL =="1.員工開戶"]<-1
+NROBOT_BASE_VALIDATE_01$RE_CHNL[NROBOT_BASE_VALIDATE_01$CHNL =="2.薪轉開發"]<-2
+NROBOT_BASE_VALIDATE_01$RE_CHNL[NROBOT_BASE_VALIDATE_01$CHNL =="3.揪團開戶"]<-3
+NROBOT_BASE_VALIDATE_01$RE_CHNL[NROBOT_BASE_VALIDATE_01$CHNL =="4.推薦開戶"]<-4
+NROBOT_BASE_VALIDATE_01$RE_CHNL[NROBOT_BASE_VALIDATE_01$CHNL =="5.分行開戶"]<-5
+NROBOT_BASE_VALIDATE_01$RE_CHNL[NROBOT_BASE_VALIDATE_01$CHNL =="6.行銷活動"]<-6
+NROBOT_BASE_VALIDATE_01$RE_CHNL[NROBOT_BASE_VALIDATE_01$CHNL =="7.自來案件"]<-7
+
+NROBOT_BASE_VALIDATE_01$RE_KYC_CHILD_CNT <- -99
+NROBOT_BASE_VALIDATE_01$RE_KYC_CHILD_CNT[NROBOT_BASE_VALIDATE_01$KYC_CHILD_CNT =="0"]<-0
+NROBOT_BASE_VALIDATE_01$RE_KYC_CHILD_CNT[NROBOT_BASE_VALIDATE_01$KYC_CHILD_CNT =="1"]<-1
+NROBOT_BASE_VALIDATE_01$RE_KYC_CHILD_CNT[NROBOT_BASE_VALIDATE_01$KYC_CHILD_CNT =="2"]<-1
+NROBOT_BASE_VALIDATE_01$RE_KYC_CHILD_CNT[NROBOT_BASE_VALIDATE_01$KYC_CHILD_CNT =="3"]<-1
+
+NROBOT_BASE_VALIDATE_01$RE_KYC_EVER_TDFD <- -99
+NROBOT_BASE_VALIDATE_01$RE_KYC_EVER_TDFD[NROBOT_BASE_VALIDATE_01$KYC_EVER_TDFD =="N"]<-0
+NROBOT_BASE_VALIDATE_01$RE_KYC_EVER_TDFD[NROBOT_BASE_VALIDATE_01$KYC_EVER_TDFD =="Y"]<-1
+
+NROBOT_BASE_VALIDATE_01$RE_KYC_EVER_STOCK <- -99
+NROBOT_BASE_VALIDATE_01$RE_KYC_EVER_STOCK[NROBOT_BASE_VALIDATE_01$KYC_EVER_STOCK =="N"]<-0
+NROBOT_BASE_VALIDATE_01$RE_KYC_EVER_STOCK[NROBOT_BASE_VALIDATE_01$KYC_EVER_STOCK =="Y"]<-1
+
+NROBOT_BASE_VALIDATE_01$RE_KYC_FR_REST <- -99
+NROBOT_BASE_VALIDATE_01$RE_KYC_FR_REST[NROBOT_BASE_VALIDATE_01$KYC_FR_REST =="N"]<-0
+NROBOT_BASE_VALIDATE_01$RE_KYC_FR_REST[NROBOT_BASE_VALIDATE_01$KYC_FR_REST =="Y"]<-1
+
+#指定FACTOR變數
+NROBOT_BASE_VALIDATE_01$RE_KYC_RISK_INTEND <- as.factor(NROBOT_BASE_VALIDATE_01$RE_KYC_RISK_INTEND)
+NROBOT_BASE_VALIDATE_01$RE_KYC_ROI_EXP <- as.factor(NROBOT_BASE_VALIDATE_01$RE_KYC_ROI_EXP)
+NROBOT_BASE_VALIDATE_01$RE_KYC_INV_PERIOD <- as.factor(NROBOT_BASE_VALIDATE_01$RE_KYC_INV_PERIOD)
+NROBOT_BASE_VALIDATE_01$RE_KYC_LOST_ACT <- as.factor(NROBOT_BASE_VALIDATE_01$RE_KYC_LOST_ACT)
+NROBOT_BASE_VALIDATE_01$RE_KYC_INV_EXP <- as.factor(NROBOT_BASE_VALIDATE_01$RE_KYC_INV_EXP)
+NROBOT_BASE_VALIDATE_01$RE_KYC_AVAILABLE_AMT <- as.factor(NROBOT_BASE_VALIDATE_01$RE_KYC_AVAILABLE_AMT)
+NROBOT_BASE_VALIDATE_01$RE_KYC_SALARY <- as.factor(NROBOT_BASE_VALIDATE_01$RE_KYC_SALARY)
+NROBOT_BASE_VALIDATE_01$RE_CHNL <- as.factor(NROBOT_BASE_VALIDATE_01$RE_CHNL)
+NROBOT_BASE_VALIDATE_01$RE_KYC_CHILD_CNT <- as.factor(NROBOT_BASE_VALIDATE_01$RE_KYC_CHILD_CNT)
+NROBOT_BASE_VALIDATE_01$RE_KYC_EVER_TDFD <- as.factor(NROBOT_BASE_VALIDATE_01$RE_KYC_EVER_TDFD)
+NROBOT_BASE_VALIDATE_01$RE_KYC_EVER_STOCK <- as.factor(NROBOT_BASE_VALIDATE_01$RE_KYC_EVER_STOCK)
+NROBOT_BASE_VALIDATE_01$RE_KYC_FR_REST <- as.factor(NROBOT_BASE_VALIDATE_01$RE_KYC_FR_REST)
+class(NROBOT_BASE_VALIDATE_01$RE_KYC_FR_REST)
+
+
+
+#驗證資料
+NROBOT_validate_sub =select(NROBOT_BASE_VALIDATE_01, TARGET,
+                        cut_thr_time_sum,total_visit,AUM,thr_time_avg,SPD_MIN_DAYS,SPD_REC_MONTH,
+                        cut_total_visit,
+                        cut_ft_time_sum,
+                        cut_thr_time_avg,
+                        cut_ft_visit,
+                        cut_PB_AMT_2M_DIF_AVG,
+                        RISK_LEVEL,
+                        cut_AUM,
+                        FUND_EVEN,
+                        RE_KYC_ROI_EXP,
+                        RE_KYC_RISK_INTEND,
+                        cut_NTD_AMT_01,
+                        cut_SPD_AMT_L3M,
+                        cut_PB_AMT_L1M_DIF,
+                        cut_SPD_AMT_3M_21,
+                        RE_KYC_INV_PERIOD,
+                        cut_SPD_CNT_3M_ONLINE,
+                        RE_KYC_LOST_ACT,
+                        RE_KYC_INV_EXP,
+                        RE_KYC_CHILD_CNT,
+                        RE_KYC_EVER_TDFD,
+                        cut_SPD_AMT_L2M,
+                        RE_KYC_AVAILABLE_AMT,
+                        cut_SPD_REC_MONTH,
+                        cut_SPD_AMT_3M_TOTAL,
+                        cut_OPN_TRUST_DAYS,
+                        KYC_OCU,
+                        RE_KYC_EVER_STOCK,
+                        RE_KYC_FR_REST,
+                        RE_KYC_SALARY,
+                        cut_age,
+                        cut_SPD_MIN_DAYS,
+                        cut_OPN_DAYS,
+                        cut_SPD_AMT_3M_ONLINE,
+                        cut_SPD_AMT_3M_OFFLINE,
+                        cut_SPD_AMT_L1M,
+                        cut_CR_TRANS_IM_OUT_AMT_L1M,
+                        cut_CR_TRANS_IM_OUT_AMT_L3M,
+                        RE_CHNL)
+
+#====================================================================
+#非信託戶資料
+NROBOT_BASE_NTRUST_01$cut_age          <- cut(NROBOT_BASE_NTRUST_01$AGE,c(0,30,35,40,45,Inf),labels = c(1:5)) 
+NROBOT_BASE_NTRUST_01$cut_thr_time_sum <- cut(NROBOT_BASE_NTRUST_01$thr_time_sum,c(-Inf,0,6,20,50,100,300,Inf),labels = c(1:7)) 
+NROBOT_BASE_NTRUST_01$cut_total_visit <-  cut(NROBOT_BASE_NTRUST_01$total_visit,c(-Inf,0,8,17,50,Inf),labels = c(1:5)) 
+NROBOT_BASE_NTRUST_01$cut_ft_time_sum <-  cut(NROBOT_BASE_NTRUST_01$ft_time_sum,c(-Inf,0,6,20,50,150,Inf),labels = c(1:6)) 
+NROBOT_BASE_NTRUST_01$cut_thr_time_avg <-  cut(NROBOT_BASE_NTRUST_01$thr_time_avg,c(-Inf,0,1,2,5,Inf),labels = c(1:5)) 
+NROBOT_BASE_NTRUST_01$cut_ft_visit <-  cut(NROBOT_BASE_NTRUST_01$ft_visit,c(-Inf,0,11,Inf),labels = c(1:3)) 
+NROBOT_BASE_NTRUST_01$cut_PB_AMT_2M_DIF_AVG <-  cut(abs(NROBOT_BASE_NTRUST_01$PB_AMT_2M_DIF_AVG),c(-Inf,0,1500,10000,Inf),labels = c(1:4)) 
+NROBOT_BASE_NTRUST_01$cut_AUM <-  cut(NROBOT_BASE_NTRUST_01$AUM,c(-Inf,1000,10000,100000,Inf),labels = c(1:4)) 
+NROBOT_BASE_NTRUST_01$cut_NTD_AMT_01 <-  cut(NROBOT_BASE_NTRUST_01$NTD_AMT_01,c(-Inf,1000,10000,80000,200000,Inf),labels = c(1:5))
+NROBOT_BASE_NTRUST_01$cut_SPD_AMT_L3M <-  cut(NROBOT_BASE_NTRUST_01$SPD_AMT_L3M,c(-Inf,0,1000,3000,Inf),labels = c(1:4)) 
+NROBOT_BASE_NTRUST_01$cut_PB_AMT_L1M_DIF <-  cut(abs(NROBOT_BASE_NTRUST_01$PB_AMT_L1M_DIF),c(-Inf,0,1500,10000,Inf),labels = c(1:4)) 
+NROBOT_BASE_NTRUST_01$cut_SPD_AMT_3M_21 <-  cut(NROBOT_BASE_NTRUST_01$SPD_AMT_3M_21,c(-Inf,500,3000,Inf),labels = c(1:3)) 
+NROBOT_BASE_NTRUST_01$cut_SPD_CNT_3M_ONLINE <-  cut(NROBOT_BASE_NTRUST_01$SPD_CNT_3M_ONLINE,c(-Inf,0,15,Inf),labels = c(1:3)) 
+NROBOT_BASE_NTRUST_01$cut_SPD_AMT_L2M <-  cut(NROBOT_BASE_NTRUST_01$SPD_AMT_L2M,c(-Inf,0,1000,3000,12000,Inf),labels = c(1:5)) 
+NROBOT_BASE_NTRUST_01$cut_SPD_REC_MONTH <-  cut(NROBOT_BASE_NTRUST_01$SPD_REC_MONTH,c(-Inf,-99,1,Inf),labels = c(1:3)) 
+NROBOT_BASE_NTRUST_01$cut_SPD_AMT_3M_TOTAL <-  cut(NROBOT_BASE_NTRUST_01$SPD_AMT_3M_TOTAL,c(-Inf,0,1000,5000,20000,Inf),labels = c(1:5))
+NROBOT_BASE_NTRUST_01$cut_OPN_TRUST_DAYS <-  cut(NROBOT_BASE_NTRUST_01$OPN_TRUST_DAYS,c(-Inf,19,90,200,Inf),labels = c(1:4)) 
+NROBOT_BASE_NTRUST_01$cut_SPD_MIN_DAYS <-  cut(NROBOT_BASE_NTRUST_01$SPD_MIN_DAYS,c(-Inf,0,30,180,270,Inf),labels = c(1:5)) 
+NROBOT_BASE_NTRUST_01$cut_OPN_DAYS <-  cut(NROBOT_BASE_NTRUST_01$OPN_DAYS,c(-Inf,100,180,240,Inf),labels = c(1:4)) 
+NROBOT_BASE_NTRUST_01$cut_SPD_AMT_3M_ONLINE <-  cut(NROBOT_BASE_NTRUST_01$SPD_AMT_3M_ONLINE,c(-Inf,0,5000,Inf),labels = c(1:3))
+NROBOT_BASE_NTRUST_01$cut_SPD_AMT_3M_OFFLINE <-  cut(NROBOT_BASE_NTRUST_01$SPD_AMT_3M_OFFLINE,c(-Inf,0,6000,Inf),labels = c(1:3))
+NROBOT_BASE_NTRUST_01$cut_SPD_AMT_L1M <-  cut(NROBOT_BASE_NTRUST_01$SPD_AMT_L1M,c(-Inf,0,1000,3000,12000,Inf),labels = c(1:5)) 
+NROBOT_BASE_NTRUST_01$cut_CR_TRANS_IM_OUT_AMT_L1M <-  cut(abs(NROBOT_BASE_NTRUST_01$CR_TRANS_IM_OUT_AMT_L1M),c(-Inf,0,30000,Inf),labels = c(1:3)) 
+NROBOT_BASE_NTRUST_01$cut_CR_TRANS_IM_OUT_AMT_L3M <-  cut(abs(NROBOT_BASE_NTRUST_01$CR_TRANS_IM_OUT_AMT_L3M),c(-Inf,0,30000,Inf),labels = c(1:3)) 
+
+table(NROBOT_BASE_NTRUST_01$cut_SPD_AMT_L1M)
+table(NROBOT_BASE_NTRUST_01$RE_KYC_FR_REST)
+
+
+#類別變數合併
+NROBOT_BASE_NTRUST_01$RE_KYC_RISK_INTEND <- 0
+NROBOT_BASE_NTRUST_01$RE_KYC_RISK_INTEND[NROBOT_BASE_NTRUST_01$KYC_RISK_INTEND =="儘量避免損失"]<-1
+NROBOT_BASE_NTRUST_01$RE_KYC_RISK_INTEND[NROBOT_BASE_NTRUST_01$KYC_RISK_INTEND =="偏好穩定收益"]<-2
+NROBOT_BASE_NTRUST_01$RE_KYC_RISK_INTEND[NROBOT_BASE_NTRUST_01$KYC_RISK_INTEND =="追求潛力報酬"]<-3
+NROBOT_BASE_NTRUST_01$RE_KYC_RISK_INTEND[NROBOT_BASE_NTRUST_01$KYC_RISK_INTEND =="追求積極獲利"]<-4
+
+NROBOT_BASE_NTRUST_01$RE_KYC_ROI_EXP <- 0
+NROBOT_BASE_NTRUST_01$RE_KYC_ROI_EXP[NROBOT_BASE_NTRUST_01$KYC_ROI_EXP =="-5%~+5%"]<-1
+NROBOT_BASE_NTRUST_01$RE_KYC_ROI_EXP[NROBOT_BASE_NTRUST_01$KYC_ROI_EXP =="-10%~+10%"]<-2
+NROBOT_BASE_NTRUST_01$RE_KYC_ROI_EXP[NROBOT_BASE_NTRUST_01$KYC_ROI_EXP =="-20%~+20%"]<-3
+NROBOT_BASE_NTRUST_01$RE_KYC_ROI_EXP[NROBOT_BASE_NTRUST_01$KYC_ROI_EXP =="-30%~+30%"]<-4
+
+NROBOT_BASE_NTRUST_01$RE_KYC_INV_PERIOD <- 0
+NROBOT_BASE_NTRUST_01$RE_KYC_INV_PERIOD[NROBOT_BASE_NTRUST_01$KYC_INV_PERIOD =="未滿6個月"]<-1
+NROBOT_BASE_NTRUST_01$RE_KYC_INV_PERIOD[NROBOT_BASE_NTRUST_01$KYC_INV_PERIOD =="6個月(含)以上，未滿1年"]<-2
+NROBOT_BASE_NTRUST_01$RE_KYC_INV_PERIOD[NROBOT_BASE_NTRUST_01$KYC_INV_PERIOD =="1年(含)以上-未滿3年"]<-3
+NROBOT_BASE_NTRUST_01$RE_KYC_INV_PERIOD[NROBOT_BASE_NTRUST_01$KYC_INV_PERIOD =="3年(含)以上"]<-4
+
+NROBOT_BASE_NTRUST_01$RE_KYC_LOST_ACT <- 0
+NROBOT_BASE_NTRUST_01$RE_KYC_LOST_ACT[NROBOT_BASE_NTRUST_01$KYC_LOST_ACT =="認賠全部賣掉"]<-1
+NROBOT_BASE_NTRUST_01$RE_KYC_LOST_ACT[NROBOT_BASE_NTRUST_01$KYC_LOST_ACT =="賣出一部份"]<-2
+NROBOT_BASE_NTRUST_01$RE_KYC_LOST_ACT[NROBOT_BASE_NTRUST_01$KYC_LOST_ACT =="再觀察一陣子"]<-3
+NROBOT_BASE_NTRUST_01$RE_KYC_LOST_ACT[NROBOT_BASE_NTRUST_01$KYC_LOST_ACT =="把握機會趁機加碼入市"]<-4
+
+NROBOT_BASE_NTRUST_01$RE_KYC_INV_EXP <- 0
+NROBOT_BASE_NTRUST_01$RE_KYC_INV_EXP[NROBOT_BASE_NTRUST_01$KYC_INV_EXP =="1年(含)以下"]<-1
+NROBOT_BASE_NTRUST_01$RE_KYC_INV_EXP[NROBOT_BASE_NTRUST_01$KYC_INV_EXP =="1年以上-3年(含)以下"]<-2
+NROBOT_BASE_NTRUST_01$RE_KYC_INV_EXP[NROBOT_BASE_NTRUST_01$KYC_INV_EXP =="3年以上- 5年(含)以下"]<-3
+NROBOT_BASE_NTRUST_01$RE_KYC_INV_EXP[NROBOT_BASE_NTRUST_01$KYC_INV_EXP =="5年以上"]<-4
+
+NROBOT_BASE_NTRUST_01$RE_KYC_AVAILABLE_AMT <- 0
+NROBOT_BASE_NTRUST_01$RE_KYC_AVAILABLE_AMT[NROBOT_BASE_NTRUST_01$KYC_AVAILABLE_AMT =="5仟(含)以下"]<-1
+NROBOT_BASE_NTRUST_01$RE_KYC_AVAILABLE_AMT[NROBOT_BASE_NTRUST_01$KYC_AVAILABLE_AMT =="5仟~1萬(含)"]<-2
+NROBOT_BASE_NTRUST_01$RE_KYC_AVAILABLE_AMT[NROBOT_BASE_NTRUST_01$KYC_AVAILABLE_AMT =="1萬~5萬(含)"]<-3
+NROBOT_BASE_NTRUST_01$RE_KYC_AVAILABLE_AMT[NROBOT_BASE_NTRUST_01$KYC_AVAILABLE_AMT =="5萬元以上"]<-4
+
+NROBOT_BASE_NTRUST_01$RE_KYC_SALARY <- 0
+NROBOT_BASE_NTRUST_01$RE_KYC_SALARY[NROBOT_BASE_NTRUST_01$KYC_SALARY =="未達50萬元"]<-1
+NROBOT_BASE_NTRUST_01$RE_KYC_SALARY[NROBOT_BASE_NTRUST_01$KYC_SALARY =="50萬(含)~100萬元"]<-2
+NROBOT_BASE_NTRUST_01$RE_KYC_SALARY[NROBOT_BASE_NTRUST_01$KYC_SALARY =="100萬(含)~150萬元"]<-3
+NROBOT_BASE_NTRUST_01$RE_KYC_SALARY[NROBOT_BASE_NTRUST_01$KYC_SALARY =="150萬元(含)以上"]<-4
+
+NROBOT_BASE_NTRUST_01$RE_CHNL <- 0
+NROBOT_BASE_NTRUST_01$RE_CHNL[NROBOT_BASE_NTRUST_01$CHNL =="1.員工開戶"]<-1
+NROBOT_BASE_NTRUST_01$RE_CHNL[NROBOT_BASE_NTRUST_01$CHNL =="2.薪轉開發"]<-2
+NROBOT_BASE_NTRUST_01$RE_CHNL[NROBOT_BASE_NTRUST_01$CHNL =="3.揪團開戶"]<-3
+NROBOT_BASE_NTRUST_01$RE_CHNL[NROBOT_BASE_NTRUST_01$CHNL =="4.推薦開戶"]<-4
+NROBOT_BASE_NTRUST_01$RE_CHNL[NROBOT_BASE_NTRUST_01$CHNL =="5.分行開戶"]<-5
+NROBOT_BASE_NTRUST_01$RE_CHNL[NROBOT_BASE_NTRUST_01$CHNL =="6.行銷活動"]<-6
+NROBOT_BASE_NTRUST_01$RE_CHNL[NROBOT_BASE_NTRUST_01$CHNL =="7.自來案件"]<-7
+
+NROBOT_BASE_NTRUST_01$RE_KYC_CHILD_CNT <- -99
+NROBOT_BASE_NTRUST_01$RE_KYC_CHILD_CNT[NROBOT_BASE_NTRUST_01$KYC_CHILD_CNT =="0"]<-0
+NROBOT_BASE_NTRUST_01$RE_KYC_CHILD_CNT[NROBOT_BASE_NTRUST_01$KYC_CHILD_CNT =="1"]<-1
+NROBOT_BASE_NTRUST_01$RE_KYC_CHILD_CNT[NROBOT_BASE_NTRUST_01$KYC_CHILD_CNT =="2"]<-1
+NROBOT_BASE_NTRUST_01$RE_KYC_CHILD_CNT[NROBOT_BASE_NTRUST_01$KYC_CHILD_CNT =="3"]<-1
+
+NROBOT_BASE_NTRUST_01$RE_KYC_EVER_TDFD <- -99
+NROBOT_BASE_NTRUST_01$RE_KYC_EVER_TDFD[NROBOT_BASE_NTRUST_01$KYC_EVER_TDFD =="N"]<-0
+NROBOT_BASE_NTRUST_01$RE_KYC_EVER_TDFD[NROBOT_BASE_NTRUST_01$KYC_EVER_TDFD =="Y"]<-1
+
+NROBOT_BASE_NTRUST_01$RE_KYC_EVER_STOCK <- -99
+NROBOT_BASE_NTRUST_01$RE_KYC_EVER_STOCK[NROBOT_BASE_NTRUST_01$KYC_EVER_STOCK =="N"]<-0
+NROBOT_BASE_NTRUST_01$RE_KYC_EVER_STOCK[NROBOT_BASE_NTRUST_01$KYC_EVER_STOCK =="Y"]<-1
+
+NROBOT_BASE_NTRUST_01$RE_KYC_FR_REST <- -99
+NROBOT_BASE_NTRUST_01$RE_KYC_FR_REST[NROBOT_BASE_NTRUST_01$KYC_FR_REST =="N"]<-0
+NROBOT_BASE_NTRUST_01$RE_KYC_FR_REST[NROBOT_BASE_NTRUST_01$KYC_FR_REST =="Y"]<-1
+
+#指定FACTOR變數
+NROBOT_BASE_NTRUST_01$RE_KYC_RISK_INTEND <- as.factor(NROBOT_BASE_NTRUST_01$RE_KYC_RISK_INTEND)
+NROBOT_BASE_NTRUST_01$RE_KYC_ROI_EXP <- as.factor(NROBOT_BASE_NTRUST_01$RE_KYC_ROI_EXP)
+NROBOT_BASE_NTRUST_01$RE_KYC_INV_PERIOD <- as.factor(NROBOT_BASE_NTRUST_01$RE_KYC_INV_PERIOD)
+NROBOT_BASE_NTRUST_01$RE_KYC_LOST_ACT <- as.factor(NROBOT_BASE_NTRUST_01$RE_KYC_LOST_ACT)
+NROBOT_BASE_NTRUST_01$RE_KYC_INV_EXP <- as.factor(NROBOT_BASE_NTRUST_01$RE_KYC_INV_EXP)
+NROBOT_BASE_NTRUST_01$RE_KYC_AVAILABLE_AMT <- as.factor(NROBOT_BASE_NTRUST_01$RE_KYC_AVAILABLE_AMT)
+NROBOT_BASE_NTRUST_01$RE_KYC_SALARY <- as.factor(NROBOT_BASE_NTRUST_01$RE_KYC_SALARY)
+NROBOT_BASE_NTRUST_01$RE_CHNL <- as.factor(NROBOT_BASE_NTRUST_01$RE_CHNL)
+NROBOT_BASE_NTRUST_01$RE_KYC_CHILD_CNT <- as.factor(NROBOT_BASE_NTRUST_01$RE_KYC_CHILD_CNT)
+NROBOT_BASE_NTRUST_01$RE_KYC_EVER_TDFD <- as.factor(NROBOT_BASE_NTRUST_01$RE_KYC_EVER_TDFD)
+NROBOT_BASE_NTRUST_01$RE_KYC_EVER_STOCK <- as.factor(NROBOT_BASE_NTRUST_01$RE_KYC_EVER_STOCK)
+NROBOT_BASE_NTRUST_01$RE_KYC_FR_REST <- as.factor(NROBOT_BASE_NTRUST_01$RE_KYC_FR_REST)
+class(NROBOT_BASE_NTRUST_01$RE_KYC_FR_REST)
+
+#測試資料
+NROBOT_BASE_NTRUST_sub =select(NROBOT_BASE_NTRUST_01, TARGET,
+                        cut_thr_time_sum,total_visit,AUM,thr_time_avg,SPD_MIN_DAYS,SPD_REC_MONTH,
+                        cut_total_visit,
+                        cut_ft_time_sum,
+                        cut_thr_time_avg,
+                        cut_ft_visit,
+                        cut_PB_AMT_2M_DIF_AVG,
+                        RISK_LEVEL,
+                        cut_AUM,
+                        FUND_EVEN,
+                        RE_KYC_ROI_EXP,
+                        RE_KYC_RISK_INTEND,
+                        cut_NTD_AMT_01,
+                        cut_SPD_AMT_L3M,
+                        cut_PB_AMT_L1M_DIF,
+                        cut_SPD_AMT_3M_21,
+                        RE_KYC_INV_PERIOD,
+                        cut_SPD_CNT_3M_ONLINE,
+                        RE_KYC_LOST_ACT,
+                        RE_KYC_INV_EXP,
+                        RE_KYC_CHILD_CNT,
+                        RE_KYC_EVER_TDFD,
+                        cut_SPD_AMT_L2M,
+                        RE_KYC_AVAILABLE_AMT,
+                        cut_SPD_REC_MONTH,
+                        cut_SPD_AMT_3M_TOTAL,
+                        cut_OPN_TRUST_DAYS,
+                        KYC_OCU,
+                        RE_KYC_EVER_STOCK,
+                        RE_KYC_FR_REST,
+                        RE_KYC_SALARY,
+                        cut_age,
+                        cut_SPD_MIN_DAYS,
+                        cut_OPN_DAYS,
+                        cut_SPD_AMT_3M_ONLINE,
+                        cut_SPD_AMT_3M_OFFLINE,
+                        cut_SPD_AMT_L1M,
+                        cut_CR_TRANS_IM_OUT_AMT_L1M,
+                        cut_CR_TRANS_IM_OUT_AMT_L3M,
+                        RE_CHNL)
+
+
+
+#跑羅吉斯模型
+fit <- glm(formula = TARGET ~ ., data = NROBOT_train_sub, family = "binomial")
+summary(fit)
+
+fit_1 <- step(fit)
+summary(fit_1)
+
+fit_2 <- glm(formula = TARGET ~ cut_total_visit + FUND_EVEN + 
+               RE_KYC_ROI_EXP + RE_KYC_RISK_INTEND + cut_NTD_AMT_01 + RE_KYC_LOST_ACT + 
+               RE_KYC_EVER_TDFD + cut_SPD_REC_MONTH + cut_OPN_TRUST_DAYS + 
+               cut_OPN_DAYS + cut_SPD_AMT_L1M, family = "binomial", data = NROBOT_train_sub)
+summary(fit_2)
+
+fit_3 <- glm(formula = TARGET ~ 
+               cut_thr_time_sum +#thr_time_avg+
+               cut_PB_AMT_2M_DIF_AVG +
+               FUND_EVEN +
+               #RE_KYC_RISK_INTEND +
+               RE_KYC_LOST_ACT +
+               cut_OPN_TRUST_DAYS +
+               cut_SPD_REC_MONTH+
+               cut_OPN_DAYS +
+               cut_SPD_AMT_L1M , family = "binomial", data = NROBOT_train_sub)
+summary(fit_3)
+
+#score[test data]
+result_test <- predict(fit_3, newdata = NROBOT_test_sub, type = "response")
+NROBOT_test_score = cbind(NROBOT_test_sub[c("TARGET")],result_test)
+NROBOT_test_score$SCORE <-  round((log(NROBOT_test_score$result_test/(1-NROBOT_test_score$result_test)))*75+700)
+NROBOT_test_score$SCORE_G <- cut(NROBOT_test_score$SCORE,c(0,150,200,250,300,350,400,450,Inf)) 
+table(NROBOT_test_score$SCORE_G, NROBOT_test_score$TARGET)
+#score[train data]
+result_train <- predict(fit_3, newdata = NROBOT_train_sub, type = "response")
+NROBOT_train_score = cbind(NROBOT_train_sub[c("TARGET")],result_train)
+NROBOT_train_score$SCORE <-  round((log(NROBOT_train_score$result_train/(1-NROBOT_train_score$result_train)))*75+700)
+NROBOT_train_score$SCORE_G <- cut(NROBOT_train_score$SCORE,c(0,150,200,250,300,350,400,450,Inf)) 
+table(NROBOT_train_score$SCORE_G, NROBOT_train_score$TARGET)
+#score[Validate data]
+result_validate <- predict(fit_3, newdata = NROBOT_validate_sub, type = "response")
+NROBOT_validate_score = cbind(NROBOT_validate_sub[c("TARGET")],result_validate)
+NROBOT_validate_score$SCORE <-  round((log(NROBOT_validate_score$result_validate/(1-NROBOT_validate_score$result_validate)))*75+700)
+NROBOT_validate_score$SCORE_G <- cut(NROBOT_validate_score$SCORE,c(0,150,200,250,300,350,400,450,Inf)) 
+table(NROBOT_validate_score$SCORE_G, NROBOT_validate_score$TARGET)
+#score[非信託戶 data]
+result_NTRUST <- predict(fit_3, newdata = NROBOT_BASE_NTRUST_sub, type = "response")
+NROBOT_NTRUST_score = cbind(NROBOT_BASE_NTRUST_sub[c("TARGET")],result_NTRUST)
+NROBOT_NTRUST_score$SCORE <-  round((log(NROBOT_NTRUST_score$result_NTRUST/(1-NROBOT_NTRUST_score$result_NTRUST)))*75+700)
+NROBOT_NTRUST_score$SCORE_G <- cut(NROBOT_NTRUST_score$SCORE,c(0,150,200,250,300,350,400,450,Inf)) 
+table(NROBOT_NTRUST_score$SCORE_G, NROBOT_NTRUST_score$TARGET)
+
+log(2)
+#檢驗共線性，VIF應小於4
+library(car)
+vif(fit_3)
+
+#畫ROC曲線
+library("ROCR")
+pred_validate <- prediction(result_validate, NROBOT_validate_sub$TARGET)
+perf_validate <- performance(pred_validate, measure = "tpr", x.measure = "fpr")
+pred_train <- prediction(result_train, NROBOT_train_sub$TARGET)
+perf_train <- performance(pred_train, measure = "tpr", x.measure = "fpr")
+
+
+#計算AUC
+auc_validate <- performance(pred_validate, "auc")
+auc_train <- performance(pred_train, "auc")
+#畫圖
+plot(perf_validate, col = rainbow(7), main = "ROC curve", xlab = "Specificity(FPR)", ylab = "Sensitivity(TPR)")
+plot(perf_train, col = "blue", main = "ROC curve", xlab = "Specificity(FPR)", ylab = "Sensitivity(TPR)")
+#AUC = 0.5
+abline(0, 1)
+#實際AUC值
+text(0.5, 0.5, as.character(auc_validate@y.values[[1]]))
+text(0.5, 0.5, as.character(auc_train@y.values[[1]]))
